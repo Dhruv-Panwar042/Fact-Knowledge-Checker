@@ -1,0 +1,11 @@
+﻿__pycache__/
+*.py[cod]
+*.class
+*.env
+.venv/
+env/
+data/uploads/*
+!data/uploads/.gitkeep
+data/knowledge_layer.db
+.DS_Store
+Thumbs.db
