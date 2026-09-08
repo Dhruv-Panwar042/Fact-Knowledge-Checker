@@ -106,7 +106,7 @@ flowchart TD
     subgraph S2 [" 🧠 2. GROUNDED FACT EXTRACTION "]
         C{"⚡ <b>Gemini LLM Fact Engine</b><br/><i>429 Quota Circuit Breaker</i>"}
         C --->|Primary Stream| D["📋 <b>JSON Fact Schema Validator</b><br/>Verbatim Source Quote Grounding"]
-        C -.->|Cooldown Fallback| E["⚙️ <b>Heuristic Rule Matcher</b><br/>Offline / Quota Safe"]
+        C --->|Cooldown Fallback| E["⚙️ <b>Heuristic Rule Matcher</b><br/>Offline / Quota Safe"]
         E ---> D
     end
 
@@ -168,6 +168,9 @@ flowchart TD
     class R2 contradCard;
     class R3 reconcCard;
     class Z1,Z2,Z3 indigoCard;
+
+    %% Bold Black Connecting Edges & Text
+    linkStyle default stroke:#000000,stroke-width:2.5px,color:#000000;
 ```
 
 ```
