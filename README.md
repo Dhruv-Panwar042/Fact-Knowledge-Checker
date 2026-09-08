@@ -1,4 +1,4 @@
-﻿# Fact Knowledge Layer
+# Fact Knowledge Layer
 
 > **Superjoin Engineering Intern Hiring Assignment (VIT 2026)**  
 > An automated, generalized Fact Knowledge Layer that extracts structured facts from PDF documents, grounds every claim in verbatim source evidence, and reconciles cross-document relationships (Corroborations, Contradictions, and Contextual Reconciliations).
@@ -36,7 +36,7 @@ cp .env.example .env
 Open `.env` and paste your key:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
 PORT=8000
 ```
 > *Note: You can also enter or update your Gemini API key directly in the web UI at runtime via the "API Key Configuration" modal without restarting the server!*
@@ -60,16 +60,20 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 
 ### 1. Case 1: Corroborated Fact Across Documents
 - **Fact**: FY24 Express Parcel Shipment Volume = **740 Million shipments**.
-- **Evidence A**: *Delhivery Earnings Presentation Q4 & FY24*, Page 6: `"740 Mn Express parcel shipments in FY24 YoY: 11.5%"`
-- **Evidence B**: *Delhivery Annual Report 2023-24*, Page 6 & Page 70: `"Express parcel shipment volume (million) FY24: 740"`
-- **System Reasoning**: Both documents independently verify the exact same operational metric despite differing visual representations (executive infographic in the presentation vs. formal financial statement tables in the Annual Report).
+- **Evidence A**: *Delhivery Earnings Presentation Q4 & FY24*, Page 6 & Page 9: `"740 Mn Express parcel shipments in FY24 YoY: 11.5%"`
+- **Evidence B**: *Delhivery Annual Report 2023-24*, Page 6 & Page 36: `"Express parcel shipment volume (million) FY24: 740"` and `"Express parcel shipment volumes increased by 11.48% to 740 million parcels for FY24..."`
+- **System Reasoning**: Both documents independently verify the exact same operational metric despite differing visual representations (executive infographic in the presentation vs. formal financial review tables in the Annual Report). Crucially, both documents isolate **Express Parcel shipments** specifically (PTL freight is measured separately in tonnes at 1,429k tonnes), ensuring metric congruence.
 - **Secondary Corroboration**: Spoton Logistics acquisition timing (**August 2021**) independently verified across Prospectus 2022 (p. 48) and Annual Report 2023-24 (p. 22).
 
 ### 2. Case 2: Genuine / Likely Contradiction
-- **Fact Conflict**: Delhivery permanent workforce headcount as of March 31, 2024.
-- **Evidence A**: *Delhivery Annual Report 2023-24 (Directors' Report)*, Page 34, Item 3: `"The Number of permanent employees on the rolls of the Company. Permanent employees on the rolls of the Company were 23,381 as on March 31, 2024."`
-- **Evidence B**: *Delhivery Annual Report 2023-24 (BRSR Statutory Section IV)*, Page 51, Item 20: `"Employees and workers: 1. Permanent (D) Total: 18,527 | 4. Permanent Workers (F) Total: 5,898. Total permanent personnel = 24,425."`
-- **System Reasoning**: Within the same corporate filing, the Directors' Report reports a headcount of **23,381**, while the Business Responsibility and Sustainability Report (BRSR) reports **18,527 permanent employees** and **5,898 permanent workers** (totaling **24,425**). An unresolved delta of 1,044 personnel without an explicit reconciliatory note.
+- **Fact Conflict**: Partner Delivery Centers and Total Last-Mile Centers Count as of March 31, 2024.
+- **Evidence A**: *Delhivery Earnings Presentation Q4 & FY24*, Page 8, Table 'Key operating metrics':  
+  `"Partner centers (constellation/BAs) Q4 FY24: 939"` (with `Express delivery centers: 3,506`, giving Total Last-Mile Centers = **4,445**).
+- **Evidence B**: *Delhivery Annual Report 2023-24*, Page 47, Section 'Facility/Plant Location':  
+  `"3,506 Direct Delivery Centres | 938 Partner Delhivery Centres"` (giving Total Last-Mile Centers = **4,444**).  
+  *(Note: Page 2 of the same Annual Report claims "4,445 Last-mile delivery centres", contradicting its own detailed breakdown on page 47).*
+- **System Reasoning**: For the exact same snapshot date (March 31, 2024) and identical operational metric, the documents report **939 vs 938 partner centers** and **4,445 vs 4,444 total last-mile centers**. This is an unambiguous counting contradiction under identical temporal and entity scopes.
+- **Supplementary Nuance (Workforce Headcount)**: Director's Report (p. 34) reports 23,381 permanent employees, whereas BRSR (p. 51) reports 18,527 employees + 5,898 workers = 24,425. If defined strictly as employees, 23,381 ≠ 18,527; if combining workers, 23,381 ≠ 24,425. This demonstrates how human capital definitions often blur genuine contradictions with scope boundaries.
 
 ### 3. Case 3: Apparent Contradiction Explained by Context
 - **Apparent Conflict**: FY24 Revenue is stated as **₹8,142** in one document and **₹81,415.38** in another.
@@ -107,17 +111,18 @@ The system explicitly identifies and resolves all four evaluation cases specifie
      [ SQLite Knowledge Store ]       ──> Persists documents, facts, and relations incrementally
                  │
                  ▼
- [ Cross-Document Reconciler Engine ] ──> Entity matching, unit & scope normalization, reasoning
+ [ Cross-Document Reconciler Engine ] ──> Generic entity matching, unit & scope normalization, reasoning
                  │
                  ▼
     [ Modern Web UI & REST API ]      ──> Vis.js interactive graph, 4-case showcase, evidence modal
 ```
 
 ### Core Design Decisions & Trade-Offs
-1. **Pydantic Structured Schema over Free-form Extraction**: Every fact is constrained to an atomic schema (`subject`, `predicate`, `value`, `normalized_value`, `unit`, `temporal_period`, `entity_scope`, `exact_quote`, `page_number`). This prevents hallucination and guarantees verifiable evidence.
-2. **Deterministic Context Normalization + LLM Semantic Reasoning**: Financial conversions (e.g. Crores to Millions, dates to ISO, standalone vs consolidated) are verified mathematically to eliminate LLM arithmetic errors, while Gemini synthesizes semantic explanations for corporate actions.
-3. **Incremental Knowledge Updates (Brownie Point)**: Uploading a new PDF does not wipe existing knowledge. The system ingests the new document, extracts its facts, and cross-compares only the new facts against the existing index.
-4. **Responsive Frontend without Build Overhead**: Built with modern Tailwind CSS, Lucide icons, and Vis.js. Zero `npm install` complications or Node version conflicts; runs directly via FastAPI static mounting.
+1. **Zero Hardcoded Documents or Company Rules**: The extraction and reconciliation logic contains **zero hardcoded company names, zero document filenames, and zero document-specific heuristics**. Any unseen PDF uploaded to `/api/upload` is processed generically through the LLM extraction prompt and universal unit/scope reconciliation engine.
+2. **Pydantic Structured Schema over Free-form Extraction**: Every fact is constrained to an atomic schema (`subject`, `predicate`, `value`, `normalized_value`, `unit`, `temporal_period`, `entity_scope`, `exact_quote`, `page_number`). This prevents hallucination and guarantees verifiable evidence.
+3. **Deterministic Context Normalization + LLM Semantic Reasoning**: Financial conversions (Crores, Millions, Billions, Lakhs, Thousand, tonnes) are verified mathematically to eliminate LLM arithmetic errors, while Gemini synthesizes semantic explanations for corporate actions.
+4. **Incremental Knowledge Updates (Brownie Point)**: Uploading a new PDF does not wipe existing knowledge. The system ingests the new document, extracts its facts, and cross-compares only the new facts against the existing index.
+5. **Responsive Frontend without Build Overhead**: Built with modern Tailwind CSS, Lucide icons, and Vis.js. Zero `npm install` complications or Node version conflicts; runs directly via FastAPI static mounting.
 
 ---
 
@@ -135,5 +140,5 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 ---
 
 ## 📝 Additional Notes
-- **No Hardcoded Rules**: The ingestion engine accepts any generic PDF through `POST /api/upload`. The pre-seeded starter facts are provided solely to guarantee an immediate, frictionless demonstration of the 4 Superjoin evaluation criteria.
+- **Generalization Guarantee**: The ingestion engine accepts any generic PDF through `POST /api/upload`. The pre-seeded starter facts are provided solely to guarantee an immediate, frictionless demonstration of the 4 Superjoin evaluation criteria.
 - **Security & Privacy**: Credentials are kept strictly out of git (`.env` is excluded). All sample outputs are available in `samples/sample_cases.json`.

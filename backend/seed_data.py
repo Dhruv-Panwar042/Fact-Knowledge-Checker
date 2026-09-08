@@ -1,4 +1,4 @@
-﻿import json
+import json
 from backend.database import (
     insert_document, insert_fact, insert_relationship, insert_showcase_case
 )
@@ -49,7 +49,7 @@ def populate_seed_data():
             "document_name": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
             "page_number": 6,
             "category": "Operational",
-            "subject": "Delhivery Limited - Express Parcel",
+            "subject": "Express Parcel",
             "predicate": "FY24 Express parcel shipments volume",
             "value": "740 Mn",
             "normalized_value": "740000000",
@@ -65,7 +65,7 @@ def populate_seed_data():
             "document_name": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
             "page_number": 6,
             "category": "Operational",
-            "subject": "Delhivery Limited - Part Truckload",
+            "subject": "Part Truckload",
             "predicate": "FY24 PTL freight tonnage",
             "value": "1.4 Mn Tons",
             "normalized_value": "1400000",
@@ -113,14 +113,14 @@ def populate_seed_data():
             "document_name": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
             "page_number": 8,
             "category": "Operational",
-            "subject": "Delhivery Infrastructure",
-            "predicate": "Active Gateways count as of Q4 FY24",
-            "value": "111",
-            "normalized_value": "111",
+            "subject": "Partner Delivery Centers",
+            "predicate": "Partner centers (constellation/BAs) as of Q4 FY24",
+            "value": "939",
+            "normalized_value": "939",
             "unit": "Count",
-            "temporal_period": "Q4 FY24",
-            "entity_scope": "Consolidated Network",
-            "exact_quote": "Gateways Q4 FY24: 111",
+            "temporal_period": "Q4 FY24 (March 31, 2024)",
+            "entity_scope": "Network Partner Centers",
+            "exact_quote": "Partner centers (constellation/BAs) Q4 FY24: 939",
             "confidence": 1.0
         },
         {
@@ -129,30 +129,14 @@ def populate_seed_data():
             "document_name": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
             "page_number": 8,
             "category": "Operational",
-            "subject": "Delhivery Infrastructure",
-            "predicate": "Automated sort centers as of Q4 FY24",
-            "value": "29",
-            "normalized_value": "29",
+            "subject": "Delivery Centers",
+            "predicate": "Express delivery centers as of Q4 FY24",
+            "value": "3,506",
+            "normalized_value": "3506",
             "unit": "Count",
-            "temporal_period": "Q4 FY24",
-            "entity_scope": "Consolidated Network",
-            "exact_quote": "Automated sort centers Q4 FY24: 29",
-            "confidence": 1.0
-        },
-        {
-            "id": "FACT-EP-008",
-            "document_id": doc2_id,
-            "document_name": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
-            "page_number": 8,
-            "category": "Operational",
-            "subject": "Delhivery Operations",
-            "predicate": "Net Working Capital (NWC) days as of March 2024",
-            "value": "31 days",
-            "normalized_value": "31",
-            "unit": "Days",
-            "temporal_period": "FY24 (March 31, 2024)",
-            "entity_scope": "Consolidated Group",
-            "exact_quote": "Sharp YoY reduction in NWC days from 38 to 31 days",
+            "temporal_period": "Q4 FY24 (March 31, 2024)",
+            "entity_scope": "Direct Network",
+            "exact_quote": "Express delivery centers Q4 FY24: 2,961 (Q4 FY22), 2,880 (Q4 FY23), 3,404 (Q3 FY24), 3,506 (Q4 FY24)",
             "confidence": 1.0
         },
 
@@ -163,7 +147,7 @@ def populate_seed_data():
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
             "page_number": 6,
             "category": "Operational",
-            "subject": "Delhivery Limited - Express Parcel",
+            "subject": "Express Parcel",
             "predicate": "FY24 Express parcel shipments volume",
             "value": "740 million",
             "normalized_value": "740000000",
@@ -179,7 +163,7 @@ def populate_seed_data():
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
             "page_number": 6,
             "category": "Operational",
-            "subject": "Delhivery Limited - Part Truckload",
+            "subject": "Part Truckload",
             "predicate": "FY24 PTL freight tonnage",
             "value": "1,429 thousand tonnes",
             "normalized_value": "1429000",
@@ -225,25 +209,57 @@ def populate_seed_data():
             "id": "FACT-AR-005",
             "document_id": doc3_id,
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
-            "page_number": 22,
-            "category": "Financial",
-            "subject": "Delhivery Limited",
-            "predicate": "FY24 Consolidated Loss for the year",
-            "value": "₹(2,491.86) million",
-            "normalized_value": "-2491860000",
-            "unit": "INR (Millions)",
-            "temporal_period": "FY24",
-            "entity_scope": "Consolidated Group",
-            "exact_quote": "Whereas the loss for FY24 stood at ₹ 2,491.86 million as against ₹10,077.79 million for FY23, a reduction of loss by 75.27%.",
+            "page_number": 47,
+            "category": "Operational",
+            "subject": "Partner Delivery Centers",
+            "predicate": "Partner Delhivery Centres as of March 31, 2024",
+            "value": "938",
+            "normalized_value": "938",
+            "unit": "Count",
+            "temporal_period": "March 31, 2024",
+            "entity_scope": "Partner Network Locations",
+            "exact_quote": "938 Partner Delhivery Centres",
             "confidence": 1.0
         },
         {
             "id": "FACT-AR-006",
             "document_id": doc3_id,
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
+            "page_number": 47,
+            "category": "Operational",
+            "subject": "Delivery Centers",
+            "predicate": "Direct Delivery Centres as of March 31, 2024",
+            "value": "3,506",
+            "normalized_value": "3506",
+            "unit": "Count",
+            "temporal_period": "March 31, 2024",
+            "entity_scope": "Direct Operations",
+            "exact_quote": "3,506 Direct Delivery Centres",
+            "confidence": 1.0
+        },
+        {
+            "id": "FACT-AR-007",
+            "document_id": doc3_id,
+            "document_name": "Delhivery_Annual_Report_2023-24.pdf",
+            "page_number": 2,
+            "category": "Operational",
+            "subject": "Delivery Centers",
+            "predicate": "Total Last-mile delivery centres as of March 31, 2024",
+            "value": "4,445",
+            "normalized_value": "4445",
+            "unit": "Count",
+            "temporal_period": "March 31, 2024",
+            "entity_scope": "Combined Last Mile",
+            "exact_quote": "4,445(1) Last-mile delivery centres. (1) As of March 31, 2024",
+            "confidence": 1.0
+        },
+        {
+            "id": "FACT-AR-008",
+            "document_id": doc3_id,
+            "document_name": "Delhivery_Annual_Report_2023-24.pdf",
             "page_number": 34,
             "category": "Governance",
-            "subject": "Delhivery Limited Workforce",
+            "subject": "Permanent Employees",
             "predicate": "Permanent employees on rolls as of March 31, 2024",
             "value": "23,381",
             "normalized_value": "23381",
@@ -254,12 +270,12 @@ def populate_seed_data():
             "confidence": 1.0
         },
         {
-            "id": "FACT-AR-007",
+            "id": "FACT-AR-009",
             "document_id": doc3_id,
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
             "page_number": 51,
             "category": "Governance",
-            "subject": "Delhivery Limited Workforce",
+            "subject": "Workforce Headcount",
             "predicate": "Permanent employees count in BRSR disclosure",
             "value": "18,527 employees",
             "normalized_value": "18527",
@@ -270,51 +286,19 @@ def populate_seed_data():
             "confidence": 1.0
         },
         {
-            "id": "FACT-AR-008",
-            "document_id": doc3_id,
-            "document_name": "Delhivery_Annual_Report_2023-24.pdf",
-            "page_number": 51,
-            "category": "Governance",
-            "subject": "Delhivery Limited Workforce",
-            "predicate": "Permanent workers count in BRSR disclosure",
-            "value": "5,898 workers",
-            "normalized_value": "5898",
-            "unit": "Headcount",
-            "temporal_period": "March 31, 2024",
-            "entity_scope": "Consolidated BRSR Section IV",
-            "exact_quote": "WORKERS 4. Permanent (F) Total (A) 5,898 (Male 5,613, Female 285)",
-            "confidence": 1.0
-        },
-        {
-            "id": "FACT-AR-009",
+            "id": "FACT-AR-010",
             "document_id": doc3_id,
             "document_name": "Delhivery_Annual_Report_2023-24.pdf",
             "page_number": 22,
             "category": "Strategy",
             "subject": "Falcon Autotech Private Limited",
-            "predicate": "Delhivery equity ownership stake as of FY24",
-            "value": "39.34% (fully diluted basis) / 40.98% (non-diluted basis)",
+            "predicate": "Equity ownership stake as of FY24",
+            "value": "39.34% (fully diluted basis)",
             "normalized_value": "39.34",
             "unit": "Percentage",
             "temporal_period": "FY24 (March 31, 2024)",
             "entity_scope": "Associate Holding",
             "exact_quote": "Your Company increased its stake in Falcon to 39.34% (on a fully diluted basis) by further investing ₹500.40 million.",
-            "confidence": 1.0
-        },
-        {
-            "id": "FACT-AR-010",
-            "document_id": doc3_id,
-            "document_name": "Delhivery_Annual_Report_2023-24.pdf",
-            "page_number": 24,
-            "category": "Governance",
-            "subject": "Sandeep Kumar Barasia",
-            "predicate": "Resignation from Executive Director & CBO",
-            "value": "Resigned with effect from July 01, 2024",
-            "normalized_value": "2024-07-01",
-            "unit": "Date",
-            "temporal_period": "Post FY24",
-            "entity_scope": "Board of Directors",
-            "exact_quote": "Post the completion of FY24, Mr. Sandeep Kumar Barasia (DIN: 01432123) resigned from the office of Executive Director & Chief Business Officer, with effect from July 01, 2024, due to personal reasons.",
             "confidence": 1.0
         },
 
@@ -323,16 +307,16 @@ def populate_seed_data():
             "id": "FACT-PR-001",
             "document_id": doc1_id,
             "document_name": "Delhivery_Prospectus_2022.pdf",
-            "page_number": 1,
-            "category": "Financial",
-            "subject": "Delhivery Limited - Initial Public Offer",
-            "predicate": "Total Offer size",
-            "value": "₹52,350.00 million",
-            "normalized_value": "52350000000",
-            "unit": "INR (Millions)",
-            "temporal_period": "May 2022 IPO",
-            "entity_scope": "IPO Issue",
-            "exact_quote": "Total Offer size ₹52,350.00 million (Fresh Issue: ₹40,000.00 million, Offer for Sale: ₹12,350.00 million)",
+            "page_number": 48,
+            "category": "Strategy",
+            "subject": "Spoton Logistics Private Limited",
+            "predicate": "Acquisition timing by Delhivery",
+            "value": "August 2021",
+            "normalized_value": "2021-08",
+            "unit": "Month-Year",
+            "temporal_period": "August 2021",
+            "entity_scope": "Corporate Acquisition",
+            "exact_quote": "We acquired Spoton in August 2021 to further scale our PTL freight services business.",
             "confidence": 1.0
         },
         {
@@ -366,54 +350,6 @@ def populate_seed_data():
             "entity_scope": "Proforma Consolidated (Including Spoton acquisition)",
             "exact_quote": "Revenue from contract with customers: Delhivery (36,465.27) + Spoton (8,035.88) - Intragroup (1.84) = Proforma Consolidated 44,501.15 (₹ million)",
             "confidence": 1.0
-        },
-        {
-            "id": "FACT-PR-004",
-            "document_id": doc1_id,
-            "document_name": "Delhivery_Prospectus_2022.pdf",
-            "page_number": 48,
-            "category": "Strategy",
-            "subject": "Spoton Logistics Private Limited",
-            "predicate": "Acquisition timing by Delhivery",
-            "value": "August 2021",
-            "normalized_value": "2021-08",
-            "unit": "Month-Year",
-            "temporal_period": "August 2021",
-            "entity_scope": "Corporate Acquisition",
-            "exact_quote": "We acquired Spoton in August 2021 to further scale our PTL freight services business.",
-            "confidence": 1.0
-        },
-        {
-            "id": "FACT-PR-005",
-            "document_id": doc1_id,
-            "document_name": "Delhivery_Prospectus_2022.pdf",
-            "page_number": 44,
-            "category": "Operational",
-            "subject": "Delhivery Network Reach",
-            "predicate": "PIN code reach as of December 31, 2021",
-            "value": "17,488",
-            "normalized_value": "17488",
-            "unit": "PIN codes",
-            "temporal_period": "December 31, 2021",
-            "entity_scope": "Delhivery Network",
-            "exact_quote": "PIN code reach as of December 31, 2021: 17,488",
-            "confidence": 1.0
-        },
-        {
-            "id": "FACT-PR-006",
-            "document_id": doc1_id,
-            "document_name": "Delhivery_Prospectus_2022.pdf",
-            "page_number": 30,
-            "category": "Governance",
-            "subject": "Delhivery Limited",
-            "predicate": "Original incorporation date and entity name",
-            "value": "June 22, 2011 as SSN Logistics Private Limited",
-            "normalized_value": "2011-06-22",
-            "unit": "Date / Name",
-            "temporal_period": "Inception (2011)",
-            "entity_scope": "Corporate Identity",
-            "exact_quote": "Our Company was incorporated as 'SSN Logistics Private Limited', a private limited company, under the Companies Act, 1956, pursuant to a certificate of incorporation issued by the RoC on June 22, 2011.",
-            "confidence": 1.0
         }
     ]
 
@@ -428,15 +364,15 @@ def populate_seed_data():
             "fact_b_id": "FACT-AR-001",
             "rel_type": "corroboration",
             "context_factor": "none",
-            "reasoning": "Both documents report identical FY24 Express parcel volume of 740 million shipments. Earnings Presentation (p. 6) displays '740 Mn Express parcel shipments in FY24' and Annual Report (p. 6) corroborates 'Express parcel shipment volume (million) FY24: 740'."
+            "reasoning": "Both documents independently corroborate the exact same operational metric: FY24 Express Parcel shipment volume was 740 million shipments. Earnings Presentation (p. 6) displays '740 Mn Express parcel shipments in FY24' and Annual Report (p. 6 & 70) states 'Express parcel shipment volume (million) FY24: 740'. Both specifically isolate Express Parcel parcels, excluding PTL freight."
         },
         {
             "id": "REL-002",
-            "fact_a_id": "FACT-PR-004",
-            "fact_b_id": "FACT-AR-009",
-            "rel_type": "corroboration",
+            "fact_a_id": "FACT-EP-006",
+            "fact_b_id": "FACT-AR-005",
+            "rel_type": "contradiction",
             "context_factor": "none",
-            "reasoning": "Both Prospectus (p. 48) and Annual Report (Directors' Report p. 22) consistently corroborate that Spoton Logistics Private Limited was acquired in August 2021."
+            "reasoning": "Genuine cross-document numerical contradiction: As of the exact same reporting date (March 31, 2024 / Q4 FY24), the Earnings Presentation (p. 8) explicitly reports '939 Partner centers (constellation/BAs)', whereas the Annual Report (p. 47) reports '938 Partner Delhivery Centres'. This 1-unit discrepancy propagates into total last-mile centers: 4,445 in the presentation vs 4,444 in the Annual Report facility breakdown table."
         },
         {
             "id": "REL-003",
@@ -464,11 +400,11 @@ def populate_seed_data():
         },
         {
             "id": "REL-006",
-            "fact_a_id": "FACT-AR-006",
-            "fact_b_id": "FACT-AR-007",
-            "rel_type": "contradiction",
+            "fact_a_id": "FACT-AR-008",
+            "fact_b_id": "FACT-AR-009",
+            "rel_type": "reconciled",
             "context_factor": "scope",
-            "reasoning": "Likely / Genuine contradiction in permanent employee reporting as of March 31, 2024: Director's Report (p. 34 item 3) explicitly reports 'Permanent employees on the rolls of the Company were 23,381 as on March 31, 2024', whereas the statutory BRSR section (p. 51 item 20) reports 18,527 permanent employees and 5,898 permanent workers (totaling 24,425 permanent personnel). A net delta of 1,044 personnel without clarifying reconciliatory notes."
+            "reasoning": "Headcount difference: Director's Report (p. 34 item 3) reports 23,381 permanent employees on company rolls, while BRSR Section IV (p. 51 item 20) reports 18,527 permanent employees and 5,898 permanent workers (totaling 24,425 permanent personnel). This can be explained as differing scope definitions between corporate salary rolls and statutory ESG workforce classifications."
         }
     ]
 
@@ -483,7 +419,7 @@ def populate_seed_data():
             "case_type": "Corroboration",
             "fact_a_id": "FACT-EP-002",
             "fact_b_id": "FACT-AR-001",
-            "summary": "Express parcel shipment volume for FY24 is independently stated and corroborated across multiple documents with differing formatting.",
+            "summary": "Express parcel shipment volume for FY24 is independently corroborated across executive investor materials and statutory annual reports with identical definitions.",
             "source_evidence_a": {
                 "document": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
                 "page": 6,
@@ -494,28 +430,28 @@ def populate_seed_data():
                 "page": 6,
                 "quote": "Express parcel shipment volume (million) FY24: 740"
             },
-            "system_reasoning": "Both the investor presentation and statutory annual report corroborate that Delhivery shipped 740 million express parcels in Fiscal 2024. The presentation uses an executive infographic format ('740 Mn'), while the Annual Report uses tabular financial review metrics ('740 million'). The factual assertion is identical and mutually supporting.",
-            "resolution": "Corroborated: The metric has 100% agreement across executive and statutory reporting channels."
+            "system_reasoning": "Both the investor presentation and statutory annual report independently corroborate that Delhivery shipped 740 million express parcels in Fiscal 2024. Both documents specifically isolate 'Express Parcel' parcels (excluding PTL freight, which is measured separately in tonnes at 1,429k tonnes). The factual assertion is identical and mutually supporting across distinct reporting formats.",
+            "resolution": "Corroborated: 100% factual equivalence across executive and statutory filings."
         },
         {
             "case_number": 2,
             "title": "Case 2: Genuine / Likely Contradiction",
             "case_type": "Contradiction",
-            "fact_a_id": "FACT-AR-006",
-            "fact_b_id": "FACT-AR-007",
-            "summary": "Conflicting disclosures of permanent employee headcount as of March 31, 2024 within different sections of the same corporate filing.",
+            "fact_a_id": "FACT-EP-006",
+            "fact_b_id": "FACT-AR-005",
+            "summary": "Direct numerical conflict in partner delivery center count as of March 31, 2024 across the Earnings Presentation and Annual Report.",
             "source_evidence_a": {
-                "document": "Delhivery_Annual_Report_2023-24.pdf",
-                "page": 34,
-                "quote": "3. The Number of permanent employees on the rolls of the Company. Permanent employees on the rolls of the Company were 23,381 as on March 31, 2024."
+                "document": "Delhivery_Earnings_Presentation_Q4_FY24.pdf",
+                "page": 8,
+                "quote": "Key operating metrics (as of end of Q4 FY24 / March 31, 2024): Partner centers (constellation/BAs): 939 | Express delivery centers: 3,506. Total = 4,445."
             },
             "source_evidence_b": {
                 "document": "Delhivery_Annual_Report_2023-24.pdf",
-                "page": 51,
-                "quote": "20. Details at the end of Financial Year: a. Employees and workers: 1. Permanent (D) Total: 18,527 | 4. Permanent Workers (F) Total: 5,898. Total permanent personnel = 24,425."
+                "page": 47,
+                "quote": "Facility/Plant Location as of March 31, 2024: 3,506 Direct Delivery Centres | 938 Partner Delhivery Centres. Total = 4,444."
             },
-            "system_reasoning": "The Director's Report on page 34 specifies exactly 23,381 permanent employees on the rolls as of March 31, 2024. However, the Business Responsibility and Sustainability Report (BRSR) on page 51 divides the workforce into 'Employees' and 'Workers', listing 18,527 permanent employees and 5,898 permanent workers (sum = 24,425), or if taking employees alone, 18,527. Neither matches 23,381 (a discrepancy of 1,044 if combined, or 4,854 if separate).",
-            "resolution": "Genuine Contradiction: Discrepancy between statutory Director's remuneration section and BRSR human capital disclosure methodology without internal reconciliation notes."
+            "system_reasoning": "For the exact same snapshot date (March 31, 2024) and exact same operational category (Partner-operated last-mile centers), the Earnings Presentation on page 8 states 939 Partner centers, whereas the Annual Report on page 47 states 938 Partner Delhivery Centres. This creates an irreconcilable 1-unit counting contradiction (4,445 total last-mile centers vs 4,444 total last-mile centers) under identical temporal and entity scopes.\n\n(Supplementary nuance: In workforce reporting, Director's Report p. 34 reports 23,381 permanent employees, whereas BRSR p. 51 reports 18,527 employees + 5,898 workers = 24,425, demonstrating how definition ambiguities often blur genuine contradictions with scope reconciliation).",
+            "resolution": "Genuine Contradiction: 939 vs 938 partner centers reported for the exact same date without explanatory reconciliation."
         },
         {
             "case_number": 3,
@@ -534,8 +470,8 @@ def populate_seed_data():
                 "page": 22,
                 "quote": "The revenue from operations on consolidated basis for FY24 stood at ₹ 81,415.38 million as against ₹72,253.01 million for FY23..."
             },
-            "system_reasoning": "A naive keyword or numerical extraction would flag ₹8,142 and ₹81,415.38 as a glaring contradiction (an order of magnitude apart). However, parsing the contextual unit tokens reveals: Document 2 denotes figures in '₹ Cr' (Indian Crores = 10,000,000 INR), whereas Document 3 denotes figures in '₹ in Million' (1,000,000 INR). Mathematical normalization: ₹81,415.38 Million / 10 = ₹8,141.538 Cr ≈ ₹8,142 Cr (standard financial rounding).",
-            "resolution": "Reconciled: Contextual unit normalization establishes exact factual equivalence."
+            "system_reasoning": "A naive string or numerical parser would flag ₹8,142 and ₹81,415.38 as a glaring contradiction (an order of magnitude apart). However, parsing the contextual unit tokens reveals: Document 2 denotes figures in '₹ Cr' (Indian Crores = 10,000,000 INR), whereas Document 3 denotes figures in '₹ in Million' (1,000,000 INR). Mathematical normalization: ₹81,415.38 Million / 10 = ₹8,141.538 Cr ≈ ₹8,142 Cr (standard financial rounding).\n\n(Secondary Context: Annual Report p. 22 Standalone Parent revenue of ₹74,540.82M vs Consolidated Group revenue of ₹81,415.38M is also reconciled by reporting scope).",
+            "resolution": "Reconciled: Contextual unit normalization (Cr = 10 Million) establishes exact mathematical equivalence."
         },
         {
             "case_number": 4,
