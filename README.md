@@ -5,12 +5,6 @@
 
 ---
 
-## 📺 Video Demo
-- **Demo Video Link**: `[Insert your 3-minute Loom or YouTube video link here]`  
-  *(A full click-by-click narration script is provided in [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) to record your 3-minute walkthrough seamlessly).*
-
----
-
 ## 🚀 Setup and Run Instructions
 
 ### Prerequisites
@@ -99,24 +93,73 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 
 ## 🏛️ Approach and Architecture
 
-### System Architecture
+### Ingestion Structure & Pipeline
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Document Ingestion"]
+        A["📄 PDF Document Upload<br/><code>POST /api/upload</code>"] --> B["PyMuPDF / pypdf Parser"]
+        B --> C["Page-Level Text & Offset Indexing"]
+    end
+
+    subgraph S2["2. Grounded Fact Extraction"]
+        C --> D{"Gemini LLM Engine<br/><i>(429 Cooldown Circuit-Breaker)</i>"}
+        D -->|Primary Stream| E["JSON Fact Schema Validator"]
+        D -->|Fallback on Rate-Limit| F["Heuristic Pattern Matcher"]
+        F --> E
+        E --> G["Verbatim Quote Grounding<br/>& Pagination Filter"]
+    end
+
+    subgraph S3["3. Persistence & Indexing"]
+        G --> H[("SQLite Knowledge Store<br/>Documents & Facts Ledger")]
+    end
+
+    subgraph S4["4. Incremental Reconciliation Engine"]
+        H --> I["Candidate Pair Selector<br/><i>O(M·N + M²) Incremental</i>"]
+        I --> J{"Cross-Document Analysis"}
+        J -->|Consistent Values| K["≈ Corroboration"]
+        J -->|Direct Value Discrepancy| L["≠ Genuine Contradiction"]
+        J -->|Unit / Scope Variance| M["≠* Contextual Reconciliation"]
+    end
+
+    subgraph S5["5. Serving & Exploration Layer"]
+        K & L & M --> N[("Relational Graph Edges")]
+        N --> O["Vis.js Interactive Graph"]
+        N --> P["4-Case Dynamic Docket"]
+        N --> Q["Source-Grounded Q&A"]
+    end
+
+    style S1 fill:#fafaf8,stroke:#64748b,stroke-width:1px
+    style S2 fill:#f8fafc,stroke:#3b82f6,stroke-width:1px
+    style S3 fill:#fefce8,stroke:#ca8a04,stroke-width:1px
+    style S4 fill:#f0fdf4,stroke:#16a34a,stroke-width:1px
+    style S5 fill:#faf5ff,stroke:#9333ea,stroke-width:1px
 ```
-  [ Upload PDF via UI / REST API ]
-                 │
-                 ▼
-  [ PyMuPDF Text & Layout Extractor ]  ──> Extracts page text with coordinate & offset indexing
-                 │
-                 ▼
-     [ Gemini LLM Fact Engine ]        ──> Extracts structured atomic facts with verbatim quotes
-                 │
-                 ▼
-     [ SQLite Knowledge Store ]       ──> Persists documents, facts, and relations incrementally
-                 │
-                 ▼
- [ Cross-Document Reconciler Engine ] ──> Generic entity matching, unit & scope normalization, reasoning
-                 │
-                 ▼
-    [ Modern Web UI & REST API ]      ──> Vis.js interactive graph, 4-case showcase, evidence modal
+
+```
++---------------------------------------------------------------------------------------------------------+
+|                                    INGESTION PIPELINE ARCHITECTURE                                      |
++---------------------------------------------------------------------------------------------------------+
+  [ Any Unseen PDF ] 
+         │
+         ▼
+  [ PyMuPDF Text Extractor ] ──> Page-level chunking, layout coordinates & text extraction
+         │
+         ▼
+  [ Gemini Fact Extractor ]  ──> Atomic fact schema extraction (subject, predicate, value, unit, quote)
+         │                       └─> (Equipped with 429 Quota Circuit Breaker & Heuristic Fallback)
+         ▼
+  [ SQLite Store ]           ──> Persists document metadata & verified fact nodes
+         │
+         ▼
+  [ Incremental Reconciler ] ──> O(M·N + M²) Pairwise evaluation:
+         │                       ├─> Entity & metric canonicalization
+         │                       ├─> Mathematical unit normalization (Crores ↔ Millions, etc.)
+         │                       └─> Discrepancy classification:
+         │                             [≈ Corroborated] | [≠ Contradiction] | [≠* Reconciled]
+         ▼
+  [ Serving Layer ]          ──> Interactive Vis.js Knowledge Graph, Dynamic Cases, Grounded Q&A
++---------------------------------------------------------------------------------------------------------+
 ```
 
 ### Core Design Decisions & Trade-Offs
