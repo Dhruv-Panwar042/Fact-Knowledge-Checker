@@ -27,7 +27,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <!-- Marked for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
@@ -136,15 +136,27 @@
 
         <!-- TAB 1: SHOWCASE CASES -->
         <section id="tab-showcase" class="tab-content block space-y-6">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900/60 border border-indigo-500/20 rounded-2xl p-6">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900/60 border border-indigo-500/20 rounded-2xl p-6">
                 <div>
                     <h2 class="text-xl font-bold text-white flex items-center space-x-2">
                         <span>Mandatory Superjoin Evaluation Cases</span>
                         <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">All 4 Demonstrated</span>
                     </h2>
-                    <p class="text-sm text-slate-400 mt-1 max-w-3xl">
-                        Every case links directly to verbatim quotes and page numbers from the starter PDFs (Prospectus 2022, Q4 FY24 Presentation, and FY24 Annual Report), demonstrating extraction, disambiguation, and reconciliation.
+                    <p class="text-sm text-slate-400 mt-1 max-w-2xl">
+                        Every case links directly to verbatim quotes and page numbers from the starter PDFs, demonstrating extraction, disambiguation, and reconciliation.
                     </p>
+                </div>
+
+                <!-- Live vs Benchmark Mode Selector -->
+                <div class="flex items-center space-x-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs shrink-0 self-start lg:self-center">
+                    <button id="btn-mode-dynamic" onclick="setShowcaseMode('dynamic')" class="px-3.5 py-1.5 rounded-lg font-medium transition-all bg-indigo-600 text-white shadow-sm flex items-center space-x-1.5">
+                        <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-300"></i>
+                        <span>Live Graph Cases</span>
+                    </button>
+                    <button id="btn-mode-benchmark" onclick="setShowcaseMode('benchmark')" class="px-3.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-slate-200 flex items-center space-x-1.5">
+                        <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
+                        <span>Reference Benchmark</span>
+                    </button>
                 </div>
             </div>
 
@@ -326,11 +338,20 @@
                     <p class="text-xs text-slate-400 mt-1">Upload any supplementary financial, legal, or operational PDF to automatically extract grounded facts and cross-reconcile with existing knowledge.</p>
                 </div>
 
+                <div class="mb-4 flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs">
+                    <span class="text-slate-300 font-medium">Page Processing Depth:</span>
+                    <select id="upload-page-depth" class="bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                        <option value="20" selected>First 20 Pages (Fast / Conserves Quota)</option>
+                        <option value="50">First 50 Pages (Deep Scan)</option>
+                        <option value="all">All Pages (Full Document)</option>
+                    </select>
+                </div>
+
                 <div id="dropzone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-8 text-center bg-slate-900/40 hover:bg-slate-900/70 transition-all cursor-pointer" onclick="document.getElementById('pdf-file-input').click()">
                     <input type="file" id="pdf-file-input" class="hidden" accept="application/pdf" onchange="handleFileSelected(event)">
                     <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-500 mx-auto mb-3"></i>
                     <p class="text-sm text-slate-200 font-medium">Click or drag and drop a PDF file here</p>
-                    <p class="text-xs text-slate-500 mt-1">Standard PDF up to 50MB supported</p>
+                    <p class="text-xs text-slate-500 mt-1">Accepts any unseen PDF (financial, legal, operational) up to 50MB</p>
                 </div>
 
                 <div id="upload-progress-card" class="hidden mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
@@ -455,6 +476,6 @@
     </footer>
 
     <!-- App JavaScript Logic -->
-    <script src="/static/app.js?v=2"></script>
+    <script src="/static/app.js?v=4"></script>
 </body>
 </html>

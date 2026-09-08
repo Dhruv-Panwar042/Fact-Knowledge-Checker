@@ -71,11 +71,29 @@ async function checkApiStatus() {
     }
 }
 
-// Load Superjoin 4 Mandatory Cases
+let currentShowcaseMode = 'dynamic';
+
+async function setShowcaseMode(mode) {
+    currentShowcaseMode = mode;
+    const btnDyn = document.getElementById('btn-mode-dynamic');
+    const btnBench = document.getElementById('btn-mode-benchmark');
+    if (btnDyn && btnBench) {
+        if (mode === 'dynamic') {
+            btnDyn.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all bg-indigo-600 text-white shadow-sm flex items-center space-x-1.5';
+            btnBench.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-slate-200 flex items-center space-x-1.5';
+        } else {
+            btnDyn.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-slate-200 flex items-center space-x-1.5';
+            btnBench.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all bg-purple-600 text-white shadow-sm flex items-center space-x-1.5';
+        }
+    }
+    await loadShowcaseCases();
+}
+
+// Load Superjoin 4 Mandatory Cases (Dynamic or Benchmark)
 async function loadShowcaseCases() {
     const container = document.getElementById('showcase-cards-container');
     try {
-        const res = await fetch('/api/cases');
+        const res = await fetch(`/api/cases?mode=${currentShowcaseMode}`);
         const cases = await res.json();
 
         container.innerHTML = cases.map(c => {
@@ -95,20 +113,29 @@ async function loadShowcaseCases() {
                 icon = 'wrench';
             }
 
+            const originBadge = c.is_live_derived ?
+                `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1"><i data-lucide="zap" class="w-3 h-3 text-amber-300"></i><span>Live Discovered</span></span>` :
+                `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center space-x-1"><i data-lucide="bookmark" class="w-3 h-3"></i><span>Reference Benchmark</span></span>`;
+
+            const factBadge = c.fact_a_id ?
+                `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800/90 text-slate-300 border border-slate-700/70">Edge: #${c.fact_a_id}${c.fact_b_id ? ` ⟷ #${c.fact_b_id}` : ''}</span>` : '';
+
             const evA = c.source_evidence_a || {};
             const evB = c.source_evidence_b || {};
 
             return `
             <div class="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                    <div class="flex items-center space-x-3">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span class="px-3 py-1 rounded-full text-xs font-bold border flex items-center space-x-1.5 ${badgeClass}">
                             <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
                             <span>${c.case_type}</span>
                         </span>
+                        ${originBadge}
+                        ${factBadge}
                         <h3 class="text-base font-bold text-white">${c.title}</h3>
                     </div>
-                    <span class="text-xs text-slate-500 font-mono">Case #${c.case_number}</span>
+                    <span class="text-xs text-slate-500 font-mono shrink-0">Case #${c.case_number}</span>
                 </div>
 
                 <p class="text-sm text-slate-300">${c.summary}</p>
@@ -392,8 +419,14 @@ async function handleFileSelected(event) {
     bar.style.width = '35%';
     msg.innerText = 'Uploading and extracting pages...';
 
+    const depthSelect = document.getElementById('upload-page-depth');
+    const depthVal = depthSelect ? depthSelect.value : '20';
+
     const formData = new FormData();
     formData.append('file', file);
+    if (depthVal !== 'all') {
+        formData.append('max_pages', parseInt(depthVal));
+    }
 
     try {
         bar.style.width = '65%';
@@ -411,7 +444,12 @@ async function handleFileSelected(event) {
 
         const data = await res.json();
         bar.style.width = '100%';
-        msg.innerHTML = `<span class="text-emerald-400 font-medium">Successfully processed ${data.pages_processed} pages! Extracted ${data.facts_extracted} facts and updated knowledge graph.</span>`;
+        msg.innerHTML = `
+            <div class="space-y-1">
+                <div class="text-emerald-400 font-medium">Successfully processed ${data.pages_processed} of ${data.total_pages} pages! Extracted ${data.facts_extracted} facts & discovered ${data.new_relationships_discovered} relationships.</div>
+                <div class="text-[11px] text-slate-400">${data.truncation_note}</div>
+            </div>
+        `;
 
         fetchStats();
         loadDocuments();
@@ -420,7 +458,7 @@ async function handleFileSelected(event) {
 
         setTimeout(() => {
             switchTab('explorer');
-        }, 1200);
+        }, 1800);
 
     } catch (e) {
         bar.classList.remove('bg-indigo-500');

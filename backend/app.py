@@ -12,13 +12,13 @@ from backend.config import UPLOAD_DIR, BASE_DIR, GEMINI_API_KEY, GEMINI_MODEL
 import backend.config as config
 from backend.database import (
     init_db, get_stats, get_all_documents, get_all_facts, get_fact_by_id,
-    get_all_relationships, get_showcase_cases, insert_document, insert_fact,
+    get_all_relationships, get_dynamic_showcase_cases, insert_document, insert_fact,
     insert_relationship
 )
 from backend.seed_data import populate_seed_data
 from backend.pdf_extractor import extract_pdf_pages
 from backend.fact_extractor import extract_facts_from_page
-from backend.reconciler import reconcile_all_facts
+from backend.reconciler import analyze_fact_pair
 
 app = FastAPI(
     title="Fact Knowledge Layer API",
@@ -39,7 +39,7 @@ def on_startup():
     init_db()
     stats = get_stats()
     if stats["documents"] == 0:
-        print("Seeding initial data from starter PDFs...")
+        print("Seeding initial starter dataset...")
         populate_seed_data()
 
 # ----------------- REST ENDPOINTS -----------------
@@ -68,8 +68,13 @@ def api_relationships(rel_type: Optional[str] = None):
     return get_all_relationships(rel_type=rel_type)
 
 @app.get("/api/cases")
-def api_cases():
-    return get_showcase_cases()
+def api_cases(mode: Optional[str] = "dynamic"):
+    """
+    Returns the 4 showcase evaluation cases.
+    - mode='dynamic': Derived live from active relationships in the database knowledge graph.
+    - mode='benchmark': Reference ground-truth benchmark cases for starter documents.
+    """
+    return get_dynamic_showcase_cases(mode=mode or "dynamic")
 
 class APIKeyRequest(BaseModel):
     api_key: str
@@ -86,8 +91,51 @@ def get_config_status():
         "model": config.GEMINI_MODEL
     }
 
+def reconcile_new_facts_incrementally(new_facts: List[Dict[str, Any]], existing_facts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Truly INCREMENTAL reconciliation:
+    1. Compares new facts against each other (intra-batch).
+    2. Compares new facts against previously existing facts in the DB (cross-batch).
+    3. NEVER re-compares existing facts against existing facts!
+    """
+    discovered_rels = []
+    seen_pairs = set()
+
+    # 1. New facts vs Existing facts
+    for nf in new_facts:
+        for ef in existing_facts:
+            pair_key = tuple(sorted([nf["id"], ef["id"]]))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            rel = analyze_fact_pair(nf, ef)
+            if rel:
+                discovered_rels.append(rel)
+
+    # 2. New facts among themselves
+    for i in range(len(new_facts)):
+        for j in range(i + 1, len(new_facts)):
+            nf1 = new_facts[i]
+            nf2 = new_facts[j]
+            pair_key = tuple(sorted([nf1["id"], nf2["id"]]))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            rel = analyze_fact_pair(nf1, nf2)
+            if rel:
+                discovered_rels.append(rel)
+
+    return discovered_rels
+
 @app.post("/api/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(
+    file: UploadFile = File(...),
+    max_pages: Optional[int] = Form(None)
+):
+    """
+    Uploads any generic PDF, extracts pages, runs grounded fact extraction with
+    page-level error isolation, and reconciles INCREMENTALLY against existing facts.
+    """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
     
@@ -95,42 +143,80 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(saved_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    pages = extract_pdf_pages(str(saved_path))
-    if not pages:
-        raise HTTPException(status_code=500, detail="Failed to extract text from PDF.")
+    # 1. Extract text and page numbers
+    try:
+        pages = extract_pdf_pages(str(saved_path))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read PDF structure: {e}")
 
+    if not pages:
+        raise HTTPException(status_code=400, detail="PDF has no readable text layer.")
+
+    total_pages = len(pages)
+    
+    # Page processing limit: transparently handle large files
+    limit = max_pages or (20 if total_pages > 25 else total_pages)
+    target_pages = pages[:limit]
+    is_truncated = total_pages > limit
+
+    # 2. Record Document in DB
     doc_id = insert_document(
         filename=file.filename,
         filepath=str(saved_path),
-        page_count=len(pages),
-        description=f"Uploaded document containing {len(pages)} pages."
+        page_count=total_pages,
+        description=f"Processed {len(target_pages)} of {total_pages} pages."
     )
 
-    extracted_facts = []
-    target_pages = pages[:15] if len(pages) > 15 else pages
-    for p in target_pages:
-        page_facts = extract_facts_from_page(
-            doc_name=file.filename,
-            page_num=p["page_number"],
-            text=p["text"],
-            api_key=config.GEMINI_API_KEY
-        )
-        for fact in page_facts:
-            fact["document_id"] = doc_id
-            insert_fact(fact)
-            extracted_facts.append(fact)
+    # 3. Existing facts in DB before this upload (for incremental comparison)
+    existing_facts = get_all_facts()
 
-    all_facts = get_all_facts()
-    new_rels = reconcile_all_facts(all_facts)
+    # 4. Extract facts page by page with strict error isolation
+    new_facts = []
+    page_warnings = []
+
+    for p in target_pages:
+        try:
+            p_text = p.get("text", "")
+            if len(p_text.strip()) < 20:
+                continue
+            
+            page_facts = extract_facts_from_page(
+                doc_name=file.filename,
+                page_num=p["page_number"],
+                text=p_text,
+                api_key=config.GEMINI_API_KEY
+            )
+
+            for f in page_facts:
+                try:
+                    f["document_id"] = doc_id
+                    insert_fact(f)
+                    new_facts.append(f)
+                except Exception as fact_err:
+                    page_warnings.append(f"Page {p['page_number']} fact skipped: {fact_err}")
+
+        except Exception as page_err:
+            page_warnings.append(f"Page {p['page_number']} extraction error: {page_err}")
+            continue
+
+    # 5. Truly INCREMENTAL reconciliation
+    new_rels = reconcile_new_facts_incrementally(new_facts, existing_facts)
     for r in new_rels:
-        insert_relationship(r)
+        try:
+            insert_relationship(r)
+        except Exception as rel_err:
+            page_warnings.append(f"Relationship save error: {rel_err}")
 
     return {
         "status": "success",
         "filename": file.filename,
+        "total_pages": total_pages,
         "pages_processed": len(target_pages),
-        "facts_extracted": len(extracted_facts),
-        "relationships_found": len(new_rels)
+        "is_truncated": is_truncated,
+        "truncation_note": f"Processed first {len(target_pages)} of {total_pages} pages to optimize extraction speed." if is_truncated else "Processed all pages.",
+        "facts_extracted": len(new_facts),
+        "new_relationships_discovered": len(new_rels),
+        "warnings": page_warnings[:5]
     }
 
 class QueryRequest(BaseModel):
@@ -144,11 +230,21 @@ def ask_question(req: QueryRequest):
 
     facts = get_all_facts()
     q_lower = query.lower()
-    relevant_facts = [
-        f for f in facts
-        if any(term in f["subject"].lower() or term in f["predicate"].lower() or term in f["value"].lower()
-               for term in q_lower.split())
-    ][:8]
+    
+    # Generic token ranking
+    q_tokens = [t for t in q_lower.split() if len(t) > 2]
+    scored_facts = []
+    for f in facts:
+        score = 0
+        searchable_text = f"{f.get('subject', '')} {f.get('predicate', '')} {f.get('value', '')} {f.get('exact_quote', '')}".lower()
+        for tok in q_tokens:
+            if tok in searchable_text:
+                score += 1
+        if score > 0:
+            scored_facts.append((score, f))
+
+    scored_facts.sort(key=lambda x: x[0], reverse=True)
+    relevant_facts = [f for _, f in scored_facts[:8]]
 
     if config.GEMINI_API_KEY and relevant_facts:
         try:
@@ -185,7 +281,7 @@ Verified Facts:
         return {"answer": summary, "grounded_facts": relevant_facts}
     else:
         return {
-            "answer": "No exact matching facts found in the current knowledge base. Try searching for revenue, express parcel, EBITDA, or workforce.",
+            "answer": "No matching facts found. Try searching for specific metrics like revenue, express parcel, EBITDA, or delivery centers.",
             "grounded_facts": []
         }
 

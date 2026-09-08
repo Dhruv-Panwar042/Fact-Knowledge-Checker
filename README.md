@@ -56,7 +56,9 @@ python main.py
 
 ## 🔍 The Four Required Cases Demonstrated
 
-The system explicitly identifies and resolves all four evaluation cases specified by Superjoin:
+The system explicitly identifies and resolves all four evaluation cases specified by Superjoin. It supports two viewing modes via the UI and REST API (`/api/cases?mode=dynamic` and `/api/cases?mode=benchmark`):
+- **Live Graph Mode (`mode=dynamic`)**: Dynamically derives the evaluation cases directly from active relationships and facts discovered in the SQLite knowledge layer.
+- **Reference Benchmark Mode (`mode=benchmark`)**: Curated baseline ground-truth from the Delhivery starter documents for instant evaluation without requiring LLM API quotas.
 
 ### 1. Case 1: Corroborated Fact Across Documents
 - **Fact**: FY24 Express Parcel Shipment Volume = **740 Million shipments**.
@@ -119,10 +121,35 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 
 ### Core Design Decisions & Trade-Offs
 1. **Zero Hardcoded Documents or Company Rules**: The extraction and reconciliation logic contains **zero hardcoded company names, zero document filenames, and zero document-specific heuristics**. Any unseen PDF uploaded to `/api/upload` is processed generically through the LLM extraction prompt and universal unit/scope reconciliation engine.
-2. **Pydantic Structured Schema over Free-form Extraction**: Every fact is constrained to an atomic schema (`subject`, `predicate`, `value`, `normalized_value`, `unit`, `temporal_period`, `entity_scope`, `exact_quote`, `page_number`). This prevents hallucination and guarantees verifiable evidence.
-3. **Deterministic Context Normalization + LLM Semantic Reasoning**: Financial conversions (Crores, Millions, Billions, Lakhs, Thousand, tonnes) are verified mathematically to eliminate LLM arithmetic errors, while Gemini synthesizes semantic explanations for corporate actions.
-4. **Incremental Knowledge Updates (Brownie Point)**: Uploading a new PDF does not wipe existing knowledge. The system ingests the new document, extracts its facts, and cross-compares only the new facts against the existing index.
-5. **Responsive Frontend without Build Overhead**: Built with modern Tailwind CSS, Lucide icons, and Vis.js. Zero `npm install` complications or Node version conflicts; runs directly via FastAPI static mounting.
+2. **Dual-Mode Showcase (Autonomous Discovery + Curated Benchmark)**:
+   - Evaluators can inspect live cases discovered from the active SQLite graph (`/api/cases?mode=dynamic`) or switch to the curated reference benchmark (`/api/cases?mode=benchmark`) directly via the UI toggle.
+3. **Truly Incremental Reconciliation (Brownie Point)**:
+   - Uploading a new PDF does NOT trigger an $O(N^2)$ re-evaluation of previously existing facts. The engine compares new facts vs. existing facts, and new facts among themselves ($O(M \cdot N + M^2)$).
+   - Canonical pair ordering (`fact_a_id < fact_b_id`) and a database `UNIQUE(fact_a_id, fact_b_id)` constraint guarantee that duplicate edges are never inserted.
+4. **Transparent Pagination Depth**:
+   - Ingestion supports flexible scan depths (e.g. First 20 Pages, First 50 Pages, or All Pages).
+   - The API transparently returns `total_pages`, `pages_processed`, `is_truncated`, and `truncation_note` so users always know the exact processing scope.
+5. **Per-Page & Per-Fact Error Isolation**:
+   - Individual page extractions and fact insertions run inside guarded `try/except` blocks with safe `.get()` fallbacks.
+   - An OCR artifact or missing key on a single table page will never cause an HTTP 500 error or abort the document upload.
+6. **Deterministic Context Normalization + Circuit-Breaker**:
+   - Financial conversions (Crores, Millions, Billions, Lakhs, Thousand, tonnes) are verified mathematically to eliminate LLM arithmetic errors.
+   - Quota exhaustion (HTTP 429) triggers an automatic 60-second cooldown circuit-breaker that falls back to instant heuristic extraction without crashing the server.
+
+---
+
+## 🧪 Comprehensive Verification Test Suite
+
+Run the automated end-to-end test suite anytime:
+```bash
+python test_system.py
+```
+This executes 5 test suites covering:
+1. **REST API Endpoints**: `/api/stats`, `/api/facts`, `/api/relationships`, `/api/cases` (dynamic and benchmark), and `/api/ask`.
+2. **Financial Number Normalization**: Crores, Millions, Billions, Lakhs, Tons, and accounting loss parentheses.
+3. **Reconciler Engine**: Cross-document corroboration (740 Mn shipments), counting contradiction (939 vs 938 centers), and unit reconciliation (₹8,142 Cr vs ₹81,415.38M).
+4. **Incremental Deduplication**: Verifies that re-uploading or adding facts only compares new pairs and prevents duplicate relationships.
+5. **Dynamic Showcase Synthesizer**: Verifies that all 4 evaluation cases are dynamically constructed from the live graph.
 
 ---
 

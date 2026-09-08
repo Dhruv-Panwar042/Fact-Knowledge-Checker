@@ -174,28 +174,30 @@ def heuristic_reconcile_pair(fact_a: Dict[str, Any], fact_b: Dict[str, Any]) -> 
                 "reasoning": f"Metrics differ because they cover different reporting periods ({fact_a.get('temporal_period')} vs {fact_b.get('temporal_period')}). Both numbers are grounded in their respective document timeframes."
             }
 
-        # Scenario 2: Same time period, normalized values match within 1.5%
-        if diff_ratio < 0.015:
-            raw_a = re.sub(r"[^\d.]", "", fact_a.get("value", ""))
-            raw_b = re.sub(r"[^\d.]", "", fact_b.get("value", ""))
-            if raw_a != raw_b and fact_a.get("unit") != fact_b.get("unit"):
-                return {
-                    "id": f"REL-{uuid.uuid4().hex[:8].upper()}",
-                    "fact_a_id": fact_a["id"],
-                    "fact_b_id": fact_b["id"],
-                    "rel_type": "reconciled",
-                    "context_factor": "unit",
-                    "reasoning": f"Apparent numerical conflict ('{fact_a['value']}' vs '{fact_b['value']}') is fully reconciled by measurement units ({fact_a.get('unit')} vs {fact_b.get('unit')}). Standardized mathematical normalization yields exact equivalence (~{val_a_num:,.2f})."
-                }
-            else:
-                return {
-                    "id": f"REL-{uuid.uuid4().hex[:8].upper()}",
-                    "fact_a_id": fact_a["id"],
-                    "fact_b_id": fact_b["id"],
-                    "rel_type": "corroboration",
-                    "context_factor": "none",
-                    "reasoning": f"Both documents independently corroborate this metric: {fact_a['document_name']} (p. {fact_a['page_number']}) reports '{fact_a['value']}' and {fact_b['document_name']} (p. {fact_b['page_number']}) reports '{fact_b['value']}'."
-                }
+        raw_a = re.sub(r"[^\d.]", "", fact_a.get("value", ""))
+        raw_b = re.sub(r"[^\d.]", "", fact_b.get("value", ""))
+
+        # Scenario 2a: Reconciled by measurement unit difference (e.g. ₹8,142 Cr vs ₹81,415.38 million)
+        if diff_ratio < 0.015 and raw_a != raw_b and fact_a.get("unit") != fact_b.get("unit"):
+            return {
+                "id": f"REL-{uuid.uuid4().hex[:8].upper()}",
+                "fact_a_id": fact_a["id"],
+                "fact_b_id": fact_b["id"],
+                "rel_type": "reconciled",
+                "context_factor": "unit",
+                "reasoning": f"Apparent numerical conflict ('{fact_a['value']}' vs '{fact_b['value']}') is fully reconciled by measurement units ({fact_a.get('unit')} vs {fact_b.get('unit')}). Standardized mathematical normalization yields exact equivalence (~{val_a_num:,.2f})."
+            }
+
+        # Scenario 2b: Exact numerical match -> Corroboration
+        if diff_ratio == 0.0 or (diff_ratio < 0.0001 and raw_a == raw_b):
+            return {
+                "id": f"REL-{uuid.uuid4().hex[:8].upper()}",
+                "fact_a_id": fact_a["id"],
+                "fact_b_id": fact_b["id"],
+                "rel_type": "corroboration",
+                "context_factor": "none",
+                "reasoning": f"Both documents independently corroborate this metric: {fact_a['document_name']} (p. {fact_a['page_number']}) reports '{fact_a['value']}' and {fact_b['document_name']} (p. {fact_b['page_number']}) reports '{fact_b['value']}'."
+            }
 
         # Scenario 3: Same period, different entity scopes
         if scope_a != scope_b and ("standalone" in scope_a or "standalone" in scope_b or "consolidated" in scope_a or "consolidated" in scope_b):
