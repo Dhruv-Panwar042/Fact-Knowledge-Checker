@@ -99,15 +99,16 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 flowchart TD
 
     subgraph S1 [" 📂 1. DOCUMENT INGESTION "]
-        A["📄 <b>PDF Document Upload</b><br/><code>POST /api/upload</code>"]
-        A ---> B["📐 <b>PyMuPDF / pypdf Parser</b><br/>Page-Level Text & Layout Offsets"]
+        A["📄 <b>PDF Document Upload</b><br/><code>POST /api/upload</code>"] --> B["📐 <b>PyMuPDF / pypdf Parser</b><br/>Page-Level Text & Layout Offsets"]
     end
 
     subgraph S2 [" 🧠 2. GROUNDED FACT EXTRACTION "]
-        C{"⚡ <b>Gemini LLM Fact Engine</b><br/><i>429 Quota Circuit Breaker</i>"}
-        C --->|Primary Stream| D["📋 <b>JSON Fact Schema Validator</b><br/>Verbatim Source Quote Grounding"]
-        C --->|Cooldown Fallback| E["⚙️ <b>Heuristic Rule Matcher</b><br/>Offline / Quota Safe"]
-        E ---> D
+        C["⚡ <b>Gemini LLM Fact Engine</b><br/><i>429 Quota Circuit Breaker</i>"]
+        D["📋 <b>JSON Fact Schema Validator</b><br/>Verbatim Source Quote Grounding"]
+        E["⚙️ <b>Heuristic Rule Matcher</b><br/>Offline / Quota Safe"]
+        C -->|Primary Stream| D
+        C -->|Cooldown Fallback| E
+        E --> D
     end
 
     subgraph S3 [" 💾 3. KNOWLEDGE PERSISTENCE "]
@@ -115,8 +116,7 @@ flowchart TD
     end
 
     subgraph S4 [" ⚖️ 4. INCREMENTAL RECONCILIATION ENGINE "]
-        G["🔍 <b>Candidate Pair Selector</b><br/><i>Incremental O(M·N + M²)</i>"]
-        G ---> H{"🔬 <b>Cross-Document Discrepancy Analysis</b><br/>Entity, Unit & Scope Disambiguation"}
+        G["🔍 <b>Candidate Pair Selector</b><br/><i>Incremental O(M·N + M²)</i>"] --> H["🔬 <b>Cross-Document Analysis</b><br/>Entity, Unit & Scope Disambiguation"]
     end
 
     subgraph S5 [" 🎯 5. RELATIONSHIP CLASSIFICATION "]
@@ -131,34 +131,34 @@ flowchart TD
         Z3["💬 <b>Source-Grounded Q&A</b>"]
     end
 
-    %% Pipeline Inter-Stage Connections with Clear Spacing
-    S1 ========> S2
-    S2 ========> S3
-    S3 ========> S4
+    %% Direct Node-to-Node Pipeline Flow (Eliminating Artificial Gaps)
+    B --> C
+    D --> F
+    F --> G
 
-    H ========>|Consistent Values| R1
-    H ========>|Direct Discrepancy| R2
-    H ========>|Unit / Scope Variance| R3
+    H -->|Consistent Values| R1
+    H -->|Direct Discrepancy| R2
+    H -->|Unit / Scope Variance| R3
 
-    R1 & R2 & R3 ========> S6
+    R1 & R2 & R3 --> S6
 
-    %% Vibrant High-Contrast Stage Containers
-    style S1 fill:#E0F2FE,stroke:#0284C7,stroke-width:2.5px,rx:12px
-    style S2 fill:#EDE9FE,stroke:#7C3AED,stroke-width:2.5px,rx:12px
-    style S3 fill:#FEF3C7,stroke:#D97706,stroke-width:2.5px,rx:12px
-    style S4 fill:#D1FAE5,stroke:#059669,stroke-width:2.5px,rx:12px
-    style S5 fill:#FCE7F3,stroke:#DB2777,stroke-width:2.5px,rx:12px
-    style S6 fill:#EEF2FF,stroke:#4F46E5,stroke-width:2.5px,rx:12px
+    %% Elevated Card Subgraph Styling (High Contrast in Dark & Light Modes)
+    style S1 fill:#1e293b,stroke:#0284c7,stroke-width:2px,rx:10px
+    style S2 fill:#1e293b,stroke:#7c3aed,stroke-width:2px,rx:10px
+    style S3 fill:#1e293b,stroke:#d97706,stroke-width:2px,rx:10px
+    style S4 fill:#1e293b,stroke:#059669,stroke-width:2px,rx:10px
+    style S5 fill:#1e293b,stroke:#db2777,stroke-width:2px,rx:10px
+    style S6 fill:#1e293b,stroke:#4f46e5,stroke-width:2px,rx:10px
 
-    %% Bright Solid Color Cards with Crisp White Text
-    classDef blueCard fill:#0284C7,stroke:#0369A1,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef purpleCard fill:#7C3AED,stroke:#5B21B6,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef amberCard fill:#D97706,stroke:#92400E,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef greenCard fill:#059669,stroke:#065F46,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef corrobCard fill:#16A34A,stroke:#14532D,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef contradCard fill:#DC2626,stroke:#7F1D1D,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef reconcCard fill:#9333EA,stroke:#581C87,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
-    classDef indigoCard fill:#4F46E5,stroke:#3730A3,stroke-width:2.5px,color:#FFFFFF,font-weight:bold,rx:8px,ry:8px;
+    %% Vibrant Solid Color Cards with Crisp White Text
+    classDef blueCard fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef purpleCard fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef amberCard fill:#d97706,stroke:#fbbf24,stroke-width:2px,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef greenCard fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
+    classDef corrobCard fill:#16a34a,stroke:#4ade80,stroke-width:2px,color:#ffffff,font-weight:bold,rx:6px,ry:6px;
+    classDef contradCard fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#ffffff,font-weight:bold,rx:6px,ry:6px;
+    classDef reconcCard fill:#9333ea,stroke:#c084fc,stroke-width:2px,color:#ffffff,font-weight:bold,rx:6px,ry:6px;
+    classDef indigoCard fill:#4f46e5,stroke:#818cf8,stroke-width:2px,color:#ffffff,font-weight:bold,rx:8px,ry:8px;
 
     class A,B blueCard;
     class C,D,E purpleCard;
@@ -169,8 +169,8 @@ flowchart TD
     class R3 reconcCard;
     class Z1,Z2,Z3 indigoCard;
 
-    %% Bold Black Connecting Edges
-    linkStyle default stroke:black,stroke-width:2px;
+    %% High-Contrast Cyan Connecting Edges (Visible on Both Dark & Light Backgrounds)
+    linkStyle default stroke:#38bdf8,stroke-width:2px;
 ```
 
 ```
