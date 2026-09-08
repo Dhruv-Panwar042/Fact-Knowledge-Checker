@@ -141,19 +141,73 @@ Return JSON:
 
     return None
 
+IGNORED_PREDICATES = {
+    "page number", "starting page number", "starts on page", "page",
+    "table of contents", "serial number", "s.no", "figure number", "chapter"
+}
+
+CORE_METRICS = {
+    "revenue", "ebitda", "profit", "shipment", "shipments", "volume",
+    "partner", "center", "centers", "centres", "headcount", "employee",
+    "employees", "workers", "loss", "turnover", "pincode", "pincodes",
+    "adoption", "target", "capacity", "gdp", "inflation"
+}
+
 def heuristic_reconcile_pair(fact_a: Dict[str, Any], fact_b: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Deterministic reconciliation comparing normalized numbers, units, time, and scope.
-    Completely instant, 100% accurate, zero API calls, and handles ANY document.
+    Strictly verifies both subject and predicate alignment to eliminate false positives.
     """
-    sim = compute_semantic_similarity(fact_a, fact_b)
-    if sim < 0.20:
+    pred_a = str(fact_a.get("predicate", "")).strip().lower()
+    pred_b = str(fact_b.get("predicate", "")).strip().lower()
+
+    # 1. Filter out document structural/pagination noise
+    if any(ip in pred_a for ip in IGNORED_PREDICATES) or any(ip in pred_b for ip in IGNORED_PREDICATES):
+        return None
+
+    # 2. Subject Matching: Ensure both claims refer to the same or compatible entity
+    sub_a = str(fact_a.get("subject", "")).strip().lower()
+    sub_b = str(fact_b.get("subject", "")).strip().lower()
+    words_sub_a = set(re.findall(r"\w+", sub_a)) - STOPWORDS
+    words_sub_b = set(re.findall(r"\w+", sub_b)) - STOPWORDS
+
+    subject_match = False
+    if sub_a == sub_b or sub_a in sub_b or sub_b in sub_a:
+        subject_match = True
+    elif words_sub_a and words_sub_b and (len(words_sub_a & words_sub_b) / len(words_sub_a | words_sub_b) >= 0.30):
+        subject_match = True
+
+    if not subject_match:
+        return None
+
+    # 3. Predicate Matching: Ensure both claims describe the same underlying metric/property
+    words_pred_a = set(re.findall(r"\w+", pred_a)) - STOPWORDS
+    words_pred_b = set(re.findall(r"\w+", pred_b)) - STOPWORDS
+
+    shared_core = (words_pred_a & words_pred_b & CORE_METRICS)
+    predicate_match = False
+    if shared_core:
+        predicate_match = True
+    elif pred_a == pred_b:
+        predicate_match = True
+    elif words_pred_a and words_pred_b:
+        pred_sim = len(words_pred_a & words_pred_b) / len(words_pred_a | words_pred_b)
+        if pred_sim >= 0.40:
+            predicate_match = True
+
+    if not predicate_match:
         return None
 
     period_a = str(fact_a.get("temporal_period", "")).strip().lower()
     period_b = str(fact_b.get("temporal_period", "")).strip().lower()
     scope_a = str(fact_a.get("entity_scope", "")).strip().lower()
     scope_b = str(fact_b.get("entity_scope", "")).strip().lower()
+
+    # Avoid self-conflict on the exact same page unless scope differs
+    same_doc = (fact_a.get("document_name") == fact_b.get("document_name"))
+    same_page = (fact_a.get("page_number") == fact_b.get("page_number"))
+    if same_doc and same_page and scope_a == scope_b and period_a == period_b:
+        return None
 
     val_a_num = parse_financial_number(fact_a.get("value", ""))
     val_b_num = parse_financial_number(fact_b.get("value", ""))

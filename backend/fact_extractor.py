@@ -44,7 +44,7 @@ def extract_facts_from_page(doc_name: str, page_num: int, text: str, api_key: Op
                 generation_config={"response_mime_type": "application/json"}
             )
             prompt = f"{EXTRACTION_SYSTEM_PROMPT}\n\nDocument: {doc_name}\nPage: {page_num}\nText content:\n{text[:4000]}"
-            response = model.generate_content(prompt)
+            response = model.generate_content(prompt, request_options={"timeout": 6})
             raw_json = response.text.strip()
             data = json.loads(raw_json)
             if isinstance(data, dict) and "facts" in data:
@@ -52,6 +52,9 @@ def extract_facts_from_page(doc_name: str, page_num: int, text: str, api_key: Op
             if isinstance(data, list):
                 extracted = []
                 for item in data:
+                    pred = str(item.get("predicate", "")).lower()
+                    if "page number" in pred or "starts on page" in pred:
+                        continue
                     item["id"] = f"FACT-{uuid.uuid4().hex[:8].upper()}"
                     item["document_name"] = doc_name
                     item["page_number"] = page_num
@@ -59,9 +62,9 @@ def extract_facts_from_page(doc_name: str, page_num: int, text: str, api_key: Op
                 return extracted
         except Exception as e:
             err_str = str(e)
-            if "429" in err_str or "quota" in err_str.lower():
-                _EXTRACTOR_COOLDOWN_UNTIL = time.time() + 60
-                print(f"Notice: Gemini quota reached on page {page_num}. Falling back to heuristic extraction.")
+            if "429" in err_str or "quota" in err_str.lower() or "resourceexhausted" in err_str.lower():
+                _EXTRACTOR_COOLDOWN_UNTIL = time.time() + 3600
+                print(f"Notice: Gemini quota reached on page {page_num}. Setting 1-hour cooldown and falling back to heuristic extraction.")
             else:
                 print(f"Gemini extraction error on page {page_num}: {e}")
 

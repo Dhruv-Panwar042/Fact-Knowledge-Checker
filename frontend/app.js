@@ -268,8 +268,17 @@ async function renderKnowledgeGraph() {
             });
         });
 
-        // Fact Nodes: Up to 35 most relevant facts to maintain layout readability
-        const displayFacts = allFacts.slice(0, 35);
+        // Prioritize facts that participate in relationships for visualization
+        const relFactIds = new Set();
+        allRels.forEach(r => {
+            if (r.fact_a_id) relFactIds.add(r.fact_a_id);
+            if (r.fact_b_id) relFactIds.add(r.fact_b_id);
+        });
+
+        const priorityFacts = allFacts.filter(f => relFactIds.has(f.id));
+        const regularFacts = allFacts.filter(f => !relFactIds.has(f.id));
+        const displayFacts = [...priorityFacts, ...regularFacts].slice(0, 30);
+
         displayFacts.forEach(f => {
             let borderColor = '#CBCCBE';
             if (f.category === 'Financial') borderColor = '#3B5D50';
@@ -305,8 +314,15 @@ async function renderKnowledgeGraph() {
             }
         });
 
-        // Relationship Cross-Document Edges
-        allRels.forEach(r => {
+        // Set of all node IDs currently on the canvas
+        const validNodeIds = new Set(nodes.map(n => n.id));
+
+        // Relationship Cross-Document Edges: ONLY between nodes present in the graph!
+        const displayRels = allRels.filter(r => 
+            validNodeIds.has(r.fact_a_id) && validNodeIds.has(r.fact_b_id)
+        ).slice(0, 25);
+
+        displayRels.forEach(r => {
             let color = '#3B5D50'; // corroboration
             let dashes = false;
             if (r.rel_type === 'contradiction') {
@@ -338,7 +354,11 @@ async function renderKnowledgeGraph() {
         });
 
         const container = document.getElementById('network-graph');
-        if (!container || !window.vis) return;
+        if (!container) return;
+        if (!window.vis) {
+            if (loader) loader.innerHTML = `<span style="color:var(--ink-soft);">Loading visualization library...</span>`;
+            return;
+        }
 
         const data = {
             nodes: new vis.DataSet(nodes),
@@ -347,14 +367,18 @@ async function renderKnowledgeGraph() {
 
         const options = {
             physics: {
-                stabilization: { iterations: 120 },
+                stabilization: {
+                    enabled: true,
+                    iterations: 50,
+                    updateInterval: 25
+                },
                 barnesHut: {
-                    gravitationalConstant: -3200,
-                    centralGravity: 0.2,
-                    springLength: 130,
+                    gravitationalConstant: -2200,
+                    centralGravity: 0.25,
+                    springLength: 110,
                     springConstant: 0.04,
                     damping: 0.09,
-                    avoidOverlap: 0.35
+                    avoidOverlap: 0.3
                 }
             },
             interaction: {
@@ -367,9 +391,17 @@ async function renderKnowledgeGraph() {
 
         if (network) {
             network.destroy();
+            network = null;
         }
 
         network = new vis.Network(container, data, options);
+
+        network.once('stabilizationIterationsDone', () => {
+            if (loader) loader.style.display = 'none';
+        });
+        setTimeout(() => {
+            if (loader) loader.style.display = 'none';
+        }, 400);
 
         // Click interaction: inspect nodes and edges
         network.on('click', (params) => {

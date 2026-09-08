@@ -128,7 +128,7 @@ def reconcile_new_facts_incrementally(new_facts: List[Dict[str, Any]], existing_
     return discovered_rels
 
 @app.post("/api/upload")
-async def upload_pdf(
+def upload_pdf(
     file: UploadFile = File(...),
     max_pages: Optional[int] = Form(None)
 ):
