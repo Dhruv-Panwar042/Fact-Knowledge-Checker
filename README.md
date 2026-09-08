@@ -93,7 +93,9 @@ The system explicitly identifies and resolves all four evaluation cases specifie
 
 ## 🏛️ Approach and Architecture
 
-### Ingestion Structure & Pipeline
+### 🔄 Interactive Ingestion Pipeline Graphic
+
+*Click any node in the flowchart below or select an interactive stage drawer to inspect live payloads, circuit-breaker fallbacks, and reconciliation logic.*
 
 ```mermaid
 flowchart TD
@@ -118,7 +120,7 @@ flowchart TD
         H --> I["Candidate Pair Selector<br/><i>O(M·N + M²) Incremental</i>"]
         I --> J{"Cross-Document Analysis"}
         J -->|Consistent Values| K["≈ Corroboration"]
-        J -->|Direct Value Discrepancy| L["≠ Genuine Contradiction"]
+        J -->|Direct Discrepancy| L["≠ Genuine Contradiction"]
         J -->|Unit / Scope Variance| M["≠* Contextual Reconciliation"]
     end
 
@@ -129,6 +131,23 @@ flowchart TD
         N --> Q["Source-Grounded Q&A"]
     end
 
+    click A href "#stage-1-ingestion" "Click to inspect Stage 1: Document Upload"
+    click B href "#stage-2-layout" "Click to inspect Stage 2: Layout Parser"
+    click C href "#stage-2-layout" "Click to inspect Stage 2: Page Offsets"
+    click D href "#stage-3-extraction" "Click to inspect Stage 3: Gemini Extractor & Circuit Breaker"
+    click E href "#stage-3-extraction" "Click to inspect Stage 3: Fact Schema"
+    click F href "#stage-3-extraction" "Click to inspect Stage 3: Heuristic Fallback"
+    click G href "#stage-3-extraction" "Click to inspect Stage 3: Quote Grounding"
+    click H href "#stage-4-persistence" "Click to inspect Stage 4: Database Storage"
+    click I href "#stage-5-reconciliation" "Click to inspect Stage 5: Incremental Reconciler"
+    click J href "#stage-5-reconciliation" "Click to inspect Stage 5: Disambiguation Logic"
+    click K href "#1-case-1-corroborated-fact-across-documents" "Click to jump to Case 1: Corroborated Fact (740M)"
+    click L href "#2-case-2-genuine--likely-contradiction" "Click to jump to Case 2: Genuine Contradiction (939 vs 938)"
+    click M href "#3-case-3-apparent-contradiction-explained-by-context" "Click to jump to Case 3: Unit Reconciliation (₹8.1k Cr)"
+    click O href "#-the-four-required-cases-demonstrated" "Click to jump to Knowledge Graph info"
+    click P href "#-the-four-required-cases-demonstrated" "Click to jump to the Four Required Cases"
+    click Q href "#-setup-and-run-instructions" "Click to view Setup & API instructions"
+
     style S1 fill:#fafaf8,stroke:#64748b,stroke-width:1px
     style S2 fill:#f8fafc,stroke:#3b82f6,stroke-width:1px
     style S3 fill:#fefce8,stroke:#ca8a04,stroke-width:1px
@@ -136,31 +155,125 @@ flowchart TD
     style S5 fill:#faf5ff,stroke:#9333ea,stroke-width:1px
 ```
 
-```
-+---------------------------------------------------------------------------------------------------------+
-|                                    INGESTION PIPELINE ARCHITECTURE                                      |
-+---------------------------------------------------------------------------------------------------------+
-  [ Any Unseen PDF ] 
-         │
-         ▼
-  [ PyMuPDF Text Extractor ] ──> Page-level chunking, layout coordinates & text extraction
-         │
-         ▼
-  [ Gemini Fact Extractor ]  ──> Atomic fact schema extraction (subject, predicate, value, unit, quote)
-         │                       └─> (Equipped with 429 Quota Circuit Breaker & Heuristic Fallback)
-         ▼
-  [ SQLite Store ]           ──> Persists document metadata & verified fact nodes
-         │
-         ▼
-  [ Incremental Reconciler ] ──> O(M·N + M²) Pairwise evaluation:
-         │                       ├─> Entity & metric canonicalization
-         │                       ├─> Mathematical unit normalization (Crores ↔ Millions, etc.)
-         │                       └─> Discrepancy classification:
-         │                             [≈ Corroborated] | [≠ Contradiction] | [≠* Reconciled]
-         ▼
-  [ Serving Layer ]          ──> Interactive Vis.js Knowledge Graph, Dynamic Cases, Grounded Q&A
-+---------------------------------------------------------------------------------------------------------+
-```
+#### 🧭 Interactive Stage Navigator
+
+| Step | Stage Component | Action / Transformation | Interactive Inspector |
+| :---: | :--- | :--- | :---: |
+| **01** | `Document Ingestion` | Multipart upload, page bounds, sync worker pool | [Inspect Stage 1 ▾](#stage-1-ingestion) |
+| **02** | `Layout & Text Parser` | PyMuPDF stream parsing, layout indexing, fallback | [Inspect Stage 2 ▾](#stage-2-layout) |
+| **03** | `Fact Extractor & Breaker` | Gemini LLM structured schema + 429 cooldown protection | [Inspect Stage 3 ▾](#stage-3-extraction) |
+| **04** | `Knowledge Ledger` | SQLite WAL persistence & atomic quote index | [Inspect Stage 4 ▾](#stage-4-persistence) |
+| **05** | `Incremental Reconciler` | $O(M\cdot N + M^2)$ pairwise entity & unit math | [Inspect Stage 5 ▾](#stage-5-reconciliation) |
+| **06** | `Relational Serving` | Vis.js physics graph, dynamic docket, source Q&A | [Inspect Stage 6 ▾](#stage-6-serving) |
+
+---
+
+#### 🔍 Interactive Pipeline Stage Drawers *(Click to expand)*
+
+<details open id="stage-1-ingestion">
+<summary><b>📄 Stage 1: Document Ingestion & Route Dispatch</b></summary>
+<br>
+
+- **Endpoint**: `POST /api/upload`
+- **Execution Model**: Synchronous worker thread execution via FastAPI threadpool (`def upload_pdf` rather than `async def`), preventing CPU-intensive PDF parsing from blocking asynchronous event loops.
+- **Payload Input**:
+  ```json
+  {
+    "filename": "delhivery_earnings_presentation_q4_fy24.pdf",
+    "max_pages": 20,
+    "filesize_bytes": 2489124
+  }
+  ```
+- **Output State**:
+  ```json
+  {
+    "doc_id": "DOC-7F4B2A",
+    "status": "processing",
+    "total_pages": 18,
+    "pages_processed": 18,
+    "is_truncated": false
+  }
+  ```
+- **Architectural Guarantee**: Universal intake. Zero hardcoded document names or schema constraints.
+</details>
+
+<details id="stage-2-layout">
+<summary><b>📐 Stage 2: PyMuPDF Layout & Text Extraction</b></summary>
+<br>
+
+- **Engine**: PyMuPDF (`fitz`) with automatic fallback to `pypdf`.
+- **Transformation**: Extracts page-by-page text streams while maintaining strict page-index offsets and boundary coordinate metadata.
+- **Isolated Error Boundary**: Page-level `try/except` wraps every single page. If page 7 contains an unreadable compressed raster, pages 1–6 and 8–18 continue processing seamlessly.
+- **Output Chunk**:
+  ```json
+  {
+    "page_number": 6,
+    "text": "740 Mn Express parcel shipments in FY24 YoY: 11.5%...",
+    "char_count": 842
+  }
+  ```
+</details>
+
+<details id="stage-3-extraction">
+<summary><b>🧠 Stage 3: Grounded Fact Extraction & Circuit-Breaker</b></summary>
+<br>
+
+- **LLM Engine**: `gemini-2.5-flash` with strict JSON-mode schema prompt.
+- **Fail-Safe Circuit Breaker**:
+  - Configured with a 6-second API timeout.
+  - If Google Gemini returns an HTTP 429 quota exhaustion, a 1-hour cooldown timestamp is activated immediately (`_EXTRACTOR_COOLDOWN_UNTIL`), instantly routing all subsequent pages to the heuristic/regex rule extractor without hanging or crashing.
+- **Strict Grounding Rule**: Every fact MUST extract an `exact_quote` that exists as an exact verbatim substring in the source page text.
+- **Output Fact Object**:
+  ```json
+  {
+    "id": "FACT-E8210D",
+    "subject": "Express Parcel Segment",
+    "predicate": "FY24 shipment volume",
+    "value": "740 Mn",
+    "normalized_value": 740000000,
+    "unit": "Shipments (Millions)",
+    "temporal_period": "FY24",
+    "entity_scope": "Consolidated",
+    "category": "Operational",
+    "exact_quote": "740 Mn Express parcel shipments in FY24",
+    "confidence": 0.98
+  }
+  ```
+</details>
+
+<details id="stage-4-persistence">
+<summary><b>💾 Stage 4: SQLite Knowledge Persistence & Indexing</b></summary>
+<br>
+
+- **Storage Engine**: SQLite with Write-Ahead Logging (`WAL` mode) enabled for non-blocking concurrent UI reads during writes.
+- **Integrity Constraints**:
+  - `UNIQUE(doc_id, page_number, predicate, exact_quote)` prevents duplicate facts.
+  - Foreign key cascades link facts to their verified document sources.
+</details>
+
+<details id="stage-5-reconciliation">
+<summary><b>⚖️ Stage 5: Incremental Cross-Document Reconciler</b></summary>
+<br>
+
+- **Incremental Complexity**: $O(M\cdot N + M^2)$ where $M$ is the number of new facts and $N$ is existing facts. Previously reconciled pairs are cached and never re-evaluated.
+- **Canonical Ordering**: Always evaluates pairs such that `fact_a_id < fact_b_id`, guaranteeing zero duplicate reverse edges.
+- **Discrepancy & Equivalence Logic**:
+  1. *Entity & Period Alignment*: Matches canonical entity tokens and temporal scopes (e.g. `FY24`, `March 31, 2024`).
+  2. *Unit Normalization*: Mathematically converts Crores ($10^7$) to Millions ($10^6$), Lakhs ($10^5$), and Billions ($10^9$).
+  3. *Classification*:
+     - **`corroborates`**: Matching normalized values across separate documents $\rightarrow$ **[Case 1: 740M Shipments](#1-case-1-corroborated-fact-across-documents)**.
+     - **`contradicts`**: Unambiguous value mismatch under identical period and scope $\rightarrow$ **[Case 2: 939 vs 938 Centers](#2-case-2-genuine--likely-contradiction)**.
+     - **`reconciled`**: Apparent token difference explained mathematically by denomination or organizational scope $\rightarrow$ **[Case 3: ₹8,142 Cr vs ₹81,415.38M](#3-case-3-apparent-contradiction-explained-by-context)**.
+</details>
+
+<details id="stage-6-serving">
+<summary><b>🕸️ Stage 6: Relational Serving & Dynamic Case Docket</b></summary>
+<br>
+
+- **Interactive Knowledge Graph**: Renders via Vis.js with a collision-free `forceAtlas2Based` physics layout (`springLength: 220`, `avoidOverlap: 1.0`).
+- **Dynamic Case Synthesizer**: Queries active SQLite relationships in real time (`/api/cases?mode=dynamic`) and binds them into an evidence dossier with direct verbatim quote modals.
+- **Source-Grounded Q&A**: Answers natural-language questions via `/api/ask`, citing specific source documents and page numbers.
+</details>
 
 ### Core Design Decisions & Trade-Offs
 1. **Zero Hardcoded Documents or Company Rules**: The extraction and reconciliation logic contains **zero hardcoded company names, zero document filenames, and zero document-specific heuristics**. Any unseen PDF uploaded to `/api/upload` is processed generically through the LLM extraction prompt and universal unit/scope reconciliation engine.
