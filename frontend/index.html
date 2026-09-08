@@ -64,6 +64,24 @@
 
             <div class="graph-layout">
                 <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label style="font-size:11.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;font-weight:500;">Focus:</label>
+                            <select id="graph-doc-filter" onchange="renderKnowledgeGraph()" style="font-family:var(--sans);font-size:12px;padding:4px 8px;border:1px solid var(--rule-strong);background:var(--paper-raised);color:var(--ink);">
+                                <option value="">All Documents (Ecosystem)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label style="font-size:11.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;font-weight:500;">Show Links:</label>
+                            <select id="graph-rel-filter" onchange="renderKnowledgeGraph()" style="font-family:var(--sans);font-size:12px;padding:4px 8px;border:1px solid var(--rule-strong);background:var(--paper-raised);color:var(--ink);">
+                                <option value="all">All Relationships</option>
+                                <option value="contradiction">Contradictions only (≠)</option>
+                                <option value="corroboration">Corroborations only (≈)</option>
+                                <option value="reconciled">Reconciliations only (≠*)</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="graph-frame">
                         <div id="graph-loader">Rendering interactive network...</div>
                         <div id="network-graph"></div>

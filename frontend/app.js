@@ -226,7 +226,7 @@ async function loadShowcaseCases() {
 }
 
 // -------------------------------------------------------------
-// Interactive Vis.js Knowledge Graph
+// Interactive Vis.js Knowledge Graph (Uncluttered & Editorial)
 // -------------------------------------------------------------
 async function renderKnowledgeGraph() {
     const loader = document.getElementById('graph-loader');
@@ -249,8 +249,19 @@ async function renderKnowledgeGraph() {
         const nodes = [];
         const edges = [];
 
-        // Document Nodes: Dark ink boxes
-        allDocs.forEach(d => {
+        // Check active UI filters
+        const docFilterVal = document.getElementById('graph-doc-filter')?.value || '';
+        const relFilterVal = document.getElementById('graph-rel-filter')?.value || 'all';
+
+        // 1. Determine which documents to show
+        let visibleDocs = allDocs;
+        if (docFilterVal) {
+            const selectedDocId = parseInt(docFilterVal);
+            visibleDocs = allDocs.filter(d => d.id === selectedDocId);
+        }
+
+        // Add Document Nodes: Dark ink boxes with ample padding
+        visibleDocs.forEach(d => {
             const shortName = d.filename.replace('.pdf', '').replace(/_/g, ' ');
             nodes.push({
                 id: 'DOC_' + d.id,
@@ -261,94 +272,140 @@ async function renderKnowledgeGraph() {
                     highlight: { background: '#3B5D50', border: '#3B5D50' }
                 },
                 shape: 'box',
-                margin: 9,
+                margin: 10,
                 font: { color: '#F6F6F1', size: 12, face: 'Public Sans', bold: true },
                 borderWidth: 1.5,
                 docData: d
             });
         });
 
-        // Prioritize facts that participate in relationships for visualization
+        // 2. Filter & Deduplicate Facts to eliminate visual clutter
+        const seenClaimKeys = new Set();
+        const distinctFacts = [];
+        for (const f of allFacts) {
+            if (docFilterVal && f.document_id !== parseInt(docFilterVal)) {
+                // If a document filter is selected, only allow facts that have a direct relationship with this doc
+                const hasRelationToDoc = allRels.some(r => 
+                    (r.fact_a_id === f.id || r.fact_b_id === f.id)
+                );
+                if (!hasRelationToDoc) continue;
+            }
+
+            const cleanSub = (f.subject || '').toLowerCase().trim();
+            const cleanVal = (f.value || '').toLowerCase().trim();
+            const dedupKey = `${f.document_id}::${cleanSub}::${cleanVal}`;
+            if (!seenClaimKeys.has(dedupKey)) {
+                seenClaimKeys.add(dedupKey);
+                distinctFacts.push(f);
+            }
+        }
+
+        // 3. Prioritize facts that participate in active relationships
         const relFactIds = new Set();
         allRels.forEach(r => {
+            if (relFilterVal !== 'all' && r.rel_type !== relFilterVal) return;
             if (r.fact_a_id) relFactIds.add(r.fact_a_id);
             if (r.fact_b_id) relFactIds.add(r.fact_b_id);
         });
 
-        const priorityFacts = allFacts.filter(f => relFactIds.has(f.id));
-        const regularFacts = allFacts.filter(f => !relFactIds.has(f.id));
-        const displayFacts = [...priorityFacts, ...regularFacts].slice(0, 30);
+        const priorityFacts = distinctFacts.filter(f => relFactIds.has(f.id));
+        const regularFacts = distinctFacts.filter(f => !relFactIds.has(f.id));
+
+        // Display at most 18-20 facts at once to ensure a clean, breathable canvas
+        const displayFacts = [
+            ...priorityFacts.slice(0, 14),
+            ...regularFacts.slice(0, docFilterVal ? 8 : 6)
+        ];
 
         displayFacts.forEach(f => {
-            let borderColor = '#CBCCBE';
+            let borderColor = '#A9AB99';
             if (f.category === 'Financial') borderColor = '#3B5D50';
             else if (f.category === 'Operational') borderColor = '#8A6524';
             else if (f.category === 'Governance') borderColor = '#8B3A2B';
 
+            // Concise labels for clean reading
+            const cleanSub = f.subject.length > 24 ? f.subject.slice(0, 22) + '…' : f.subject;
+            const cleanVal = f.value.length > 20 ? f.value.slice(0, 18) + '…' : f.value;
+
             nodes.push({
                 id: f.id,
-                label: `${f.subject}\n${f.value}`,
+                label: `${cleanSub}\n${cleanVal}`,
                 color: {
                     background: '#F6F6F1',
                     border: borderColor,
                     highlight: { background: '#F7F2E1', border: '#23241F' }
                 },
                 shape: 'box',
-                borderRadius: 4,
-                margin: 7,
-                font: { color: '#23241F', size: 10, face: 'Public Sans' },
+                borderRadius: 5,
+                margin: 8,
+                font: { color: '#23241F', size: 10.5, face: 'Public Sans' },
                 borderWidth: 1.5,
                 factData: f
             });
 
-            // Doc-to-fact spoke edge
-            if (f.document_id) {
+            // Spoke edge from Document to Fact: subtle, soft opacity
+            const docNodeExists = visibleDocs.some(d => d.id === f.document_id);
+            if (docNodeExists) {
                 edges.push({
-                    id: `edge_doc_${f.id}`,
+                    id: `spoke_${f.id}`,
                     from: 'DOC_' + f.document_id,
                     to: f.id,
-                    color: { color: '#CBCCBE', highlight: '#5C5D53' },
-                    dashes: [3, 3],
-                    width: 1
+                    color: { color: '#CBCCBE', opacity: 0.45 },
+                    dashes: [4, 4],
+                    width: 1,
+                    smooth: false,
+                    arrows: ''
                 });
             }
         });
 
-        // Set of all node IDs currently on the canvas
+        // 4. Cross-Document Relationship Links (Sparse, informative, NO arrow clutter)
         const validNodeIds = new Set(nodes.map(n => n.id));
+        const seenPairs = new Set();
+        const displayRels = [];
 
-        // Relationship Cross-Document Edges: ONLY between nodes present in the graph!
-        const displayRels = allRels.filter(r => 
-            validNodeIds.has(r.fact_a_id) && validNodeIds.has(r.fact_b_id)
-        ).slice(0, 25);
+        for (const r of allRels) {
+            if (relFilterVal !== 'all' && r.rel_type !== relFilterVal) continue;
+            if (!validNodeIds.has(r.fact_a_id) || !validNodeIds.has(r.fact_b_id)) continue;
+
+            const pairKey = [r.fact_a_id, r.fact_b_id].sort().join('::');
+            if (seenPairs.has(pairKey)) continue; // Prevent redundant multiple edges
+            seenPairs.add(pairKey);
+            displayRels.push(r);
+            if (displayRels.length >= 15) break; // Limit to 15 key relationships max
+        }
 
         displayRels.forEach(r => {
             let color = '#3B5D50'; // corroboration
+            let symbol = '≈ Corroborated';
             let dashes = false;
             if (r.rel_type === 'contradiction') {
                 color = '#8B3A2B';
+                symbol = '≠ Contradiction';
                 dashes = [5, 4];
             } else if (r.rel_type === 'reconciled') {
                 color = '#8A6524';
+                symbol = '≠* Reconciled';
             }
 
             edges.push({
                 id: 'rel_' + r.id,
                 from: r.fact_a_id,
                 to: r.fact_b_id,
-                label: r.rel_type.toUpperCase(),
+                label: symbol,
                 color: { color: color, highlight: color },
                 font: {
-                    color: '#23241F',
-                    size: 9,
+                    color: color,
+                    size: 9.5,
                     face: 'Public Sans',
                     background: '#F6F6F1',
-                    strokeWidth: 0
+                    strokeWidth: 2,
+                    strokeColor: '#F6F6F1'
                 },
                 width: 2.2,
                 dashes: dashes,
-                arrows: 'to, from',
-                smooth: { type: 'curvedCW', roundness: 0.2 },
+                arrows: '', // NO arrow clutter! Clean lines with centered labels
+                smooth: { type: 'continuous', roundness: 0.15 },
                 relData: r
             });
         });
@@ -365,20 +422,22 @@ async function renderKnowledgeGraph() {
             edges: new vis.DataSet(edges)
         };
 
+        // Physics: forceAtlas2Based with generous spacing and 100% overlap avoidance
         const options = {
             physics: {
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -180,
+                    centralGravity: 0.008,
+                    springLength: 220,
+                    springConstant: 0.05,
+                    damping: 0.7,
+                    avoidOverlap: 1.0
+                },
                 stabilization: {
                     enabled: true,
-                    iterations: 50,
+                    iterations: 75,
                     updateInterval: 25
-                },
-                barnesHut: {
-                    gravitationalConstant: -2200,
-                    centralGravity: 0.25,
-                    springLength: 110,
-                    springConstant: 0.04,
-                    damping: 0.09,
-                    avoidOverlap: 0.3
                 }
             },
             interaction: {
@@ -482,7 +541,11 @@ function renderGraphDocList(docs, facts) {
 }
 
 function focusGraphDocument(docId) {
-    if (network) {
+    const select = document.getElementById('graph-doc-filter');
+    if (select) {
+        select.value = docId;
+        renderKnowledgeGraph();
+    } else if (network) {
         network.focus('DOC_' + docId, {
             scale: 1.1,
             animation: { duration: 600, easingFunction: 'easeInOutQuad' }
@@ -491,9 +554,11 @@ function focusGraphDocument(docId) {
 }
 
 function resetGraphView() {
-    if (network) {
-        network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
-    }
+    const select = document.getElementById('graph-doc-filter');
+    if (select) select.value = '';
+    const relSelect = document.getElementById('graph-rel-filter');
+    if (relSelect) relSelect.value = 'all';
+    renderKnowledgeGraph();
 }
 
 function filterByDocument(docName) {
@@ -591,6 +656,19 @@ async function loadDocuments() {
             });
             docSelect.innerHTML = optionsHtml;
             docSelect.value = currentVal;
+        }
+
+        // Update Document dropdown in Graph filter
+        const graphDocSelect = document.getElementById('graph-doc-filter');
+        if (graphDocSelect) {
+            const currentGraphVal = graphDocSelect.value;
+            let optionsHtml = '<option value="">All Documents (Ecosystem)</option>';
+            allDocs.forEach(d => {
+                const shortName = d.filename.replace('.pdf', '').replace(/_/g, ' ');
+                optionsHtml += `<option value="${d.id}">${escapeHtml(shortName)}</option>`;
+            });
+            graphDocSelect.innerHTML = optionsHtml;
+            graphDocSelect.value = currentGraphVal;
         }
 
         // Update Document list in Upload tab

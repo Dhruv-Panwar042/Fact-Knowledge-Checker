@@ -203,10 +203,22 @@ def heuristic_reconcile_pair(fact_a: Dict[str, Any], fact_b: Dict[str, Any]) -> 
     scope_a = str(fact_a.get("entity_scope", "")).strip().lower()
     scope_b = str(fact_b.get("entity_scope", "")).strip().lower()
 
-    # Avoid self-conflict on the exact same page unless scope differs
+    # Rule: Cross-document comparison only (or intra-document only when comparing contrasting scopes like standalone vs consolidated)
     same_doc = (fact_a.get("document_name") == fact_b.get("document_name"))
-    same_page = (fact_a.get("page_number") == fact_b.get("page_number"))
-    if same_doc and same_page and scope_a == scope_b and period_a == period_b:
+    if same_doc:
+        is_scope_contrast = (("standalone" in scope_a and "consolidated" in scope_b) or
+                             ("consolidated" in scope_a and "standalone" in scope_b))
+        if not is_scope_contrast:
+            return None
+
+    # Strip generic adjectives (global, national, total) to verify actual subject entity matches
+    MODIFIER_WORDS = {"global", "national", "total", "net", "general", "overall", "domestic", "international", "annual", "quarterly", "trend", "rate", "average"}
+    core_sub_a = words_sub_a - MODIFIER_WORDS
+    core_sub_b = words_sub_b - MODIFIER_WORDS
+    if core_sub_a and core_sub_b:
+        if not (core_sub_a & core_sub_b):
+            return None
+    elif sub_a != sub_b:
         return None
 
     val_a_num = parse_financial_number(fact_a.get("value", ""))
