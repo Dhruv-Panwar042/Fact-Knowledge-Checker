@@ -1,333 +1,99 @@
-// State
+// Fact Knowledge Layer - Core Application Logic
+// Styled for Editorial Paper & Docket Aesthetic
+
+// Global State
 let allFacts = [];
 let allDocs = [];
 let allRels = [];
 let network = null;
+let currentShowcaseMode = 'dynamic';
+
+// Helper: Escape HTML
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.lucide) lucide.createIcons();
-    fetchStats();
+    initNavigation();
+    initDropzone();
+    checkApiStatus();
     loadShowcaseCases();
     loadDocuments();
     loadFacts();
-    checkApiStatus();
 });
 
-// Tab Navigation
+// -------------------------------------------------------------
+// Navigation & Tab Switching
+// -------------------------------------------------------------
+function initNavigation() {
+    // Check if any tab is hash-selected or default to cases
+    const hash = window.location.hash.replace('#', '');
+    if (hash && ['cases', 'graph', 'facts', 'ask', 'upload'].includes(hash)) {
+        switchTab(hash);
+    }
+}
+
 function switchTab(tabId) {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active', 'text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/30');
-        btn.classList.add('text-slate-400', 'border-transparent');
-    });
+    // Update nav links
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    const activeNav = document.getElementById('nav-' + tabId);
+    if (activeNav) activeNav.classList.add('active');
 
-    const activeBtn = document.getElementById('tab-btn-' + tabId);
-    if (activeBtn) {
-        activeBtn.classList.add('active', 'text-indigo-400', 'bg-indigo-500/10', 'border-indigo-500/30');
-        activeBtn.classList.remove('text-slate-400', 'border-transparent');
-    }
+    // Update section visibility
+    document.querySelectorAll('section').forEach(sec => sec.classList.remove('active'));
+    const targetSection = document.getElementById(tabId);
+    if (targetSection) targetSection.classList.add('active');
 
-    document.querySelectorAll('.tab-content').forEach(sec => sec.classList.add('hidden'));
-    const target = document.getElementById('tab-' + tabId);
-    if (target) {
-        target.classList.remove('hidden');
-    }
-
-    if (window.lucide) lucide.createIcons();
-
+    // Trigger graph layout if switched to graph tab
     if (tabId === 'graph') {
-        setTimeout(renderKnowledgeGraph, 100);
+        setTimeout(renderKnowledgeGraph, 80);
     }
 }
 
-// Fetch System Stats
-async function fetchStats() {
-    try {
-        const res = await fetch('/api/stats');
-        const data = await res.json();
-        document.getElementById('stat-docs').innerText = data.documents;
-        document.getElementById('stat-facts').innerText = data.facts;
-        document.getElementById('stat-corrob').innerText = data.corroborations;
-        document.getElementById('stat-contra').innerText = data.contradictions;
-        document.getElementById('stat-reconciled').innerText = data.reconciled;
-    } catch (e) {
-        console.error('Failed to load stats:', e);
-    }
-}
-
-// Check API Key Status
+// -------------------------------------------------------------
+// API Key Status & Settings
+// -------------------------------------------------------------
 async function checkApiStatus() {
     try {
         const res = await fetch('/api/config/status');
         const data = await res.json();
-        const badge = document.getElementById('api-status-text');
-        if (data.has_gemini_key) {
-            badge.innerText = data.model + ' (Ready)';
-        } else {
-            badge.innerText = 'Offline Heuristic Mode';
-        }
-    } catch (e) {
-        console.error(e);
-    }
-}
+        const badgeText = document.getElementById('api-status-text');
+        const badgeDot = document.getElementById('api-dot');
 
-let currentShowcaseMode = 'dynamic';
-
-async function setShowcaseMode(mode) {
-    currentShowcaseMode = mode;
-    const btnDyn = document.getElementById('btn-mode-dynamic');
-    const btnBench = document.getElementById('btn-mode-benchmark');
-    if (btnDyn && btnBench) {
-        if (mode === 'dynamic') {
-            btnDyn.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all bg-indigo-600 text-white shadow-sm flex items-center space-x-1.5';
-            btnBench.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-slate-200 flex items-center space-x-1.5';
-        } else {
-            btnDyn.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-slate-200 flex items-center space-x-1.5';
-            btnBench.className = 'px-3.5 py-1.5 rounded-lg font-medium transition-all bg-purple-600 text-white shadow-sm flex items-center space-x-1.5';
-        }
-    }
-    await loadShowcaseCases();
-}
-
-// Load Superjoin 4 Mandatory Cases (Dynamic or Benchmark)
-async function loadShowcaseCases() {
-    const container = document.getElementById('showcase-cards-container');
-    try {
-        const res = await fetch(`/api/cases?mode=${currentShowcaseMode}`);
-        const cases = await res.json();
-
-        container.innerHTML = cases.map(c => {
-            let badgeClass = 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
-            let icon = 'sparkles';
-            if (c.case_type === 'Corroboration') {
-                badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-                icon = 'check-circle-2';
-            } else if (c.case_type === 'Contradiction') {
-                badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
-                icon = 'alert-triangle';
-            } else if (c.case_type === 'Reconciled Contradiction') {
-                badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-                icon = 'scale';
-            } else if (c.case_type === 'Reasoning Failure Analysis') {
-                badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/30';
-                icon = 'wrench';
+        if (badgeText && badgeDot) {
+            if (data.has_gemini_key) {
+                badgeText.innerText = 'Gemini Active';
+                badgeDot.style.background = 'var(--green)';
+            } else {
+                badgeText.innerText = 'Offline Mode';
+                badgeDot.style.background = 'var(--ochre)';
             }
-
-            const originBadge = c.is_live_derived ?
-                `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1"><i data-lucide="zap" class="w-3 h-3 text-amber-300"></i><span>Live Discovered</span></span>` :
-                `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center space-x-1"><i data-lucide="bookmark" class="w-3 h-3"></i><span>Reference Benchmark</span></span>`;
-
-            const factBadge = c.fact_a_id ?
-                `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800/90 text-slate-300 border border-slate-700/70">Edge: #${c.fact_a_id}${c.fact_b_id ? ` ⟷ #${c.fact_b_id}` : ''}</span>` : '';
-
-            const evA = c.source_evidence_a || {};
-            const evB = c.source_evidence_b || {};
-
-            return `
-            <div class="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="px-3 py-1 rounded-full text-xs font-bold border flex items-center space-x-1.5 ${badgeClass}">
-                            <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
-                            <span>${c.case_type}</span>
-                        </span>
-                        ${originBadge}
-                        ${factBadge}
-                        <h3 class="text-base font-bold text-white">${c.title}</h3>
-                    </div>
-                    <span class="text-xs text-slate-500 font-mono shrink-0">Case #${c.case_number}</span>
-                </div>
-
-                <p class="text-sm text-slate-300">${c.summary}</p>
-
-                <!-- Side by Side Evidence Comparison -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800/80 space-y-2">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-indigo-400 flex items-center space-x-1">
-                                <i data-lucide="file" class="w-3.5 h-3.5"></i>
-                                <span class="truncate max-w-[200px]">${evA.document || 'Source A'}</span>
-                            </span>
-                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[11px]">Page ${evA.page || 'N/A'}</span>
-                        </div>
-                        <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/60 text-xs italic font-serif text-slate-200 leading-relaxed">
-                            "${evA.quote || 'N/A'}"
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800/80 space-y-2">
-                        <div class="flex items-center justify-between text-xs">
-                            <span class="font-semibold text-purple-400 flex items-center space-x-1">
-                                <i data-lucide="file" class="w-3.5 h-3.5"></i>
-                                <span class="truncate max-w-[200px]">${evB.document || 'Source B'}</span>
-                            </span>
-                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[11px]">Page ${evB.page || 'N/A'}</span>
-                        </div>
-                        <div class="p-3 bg-slate-950/60 rounded-lg border border-slate-800/60 text-xs italic font-serif text-slate-200 leading-relaxed">
-                            "${evB.quote || 'N/A'}"
-                        </div>
-                    </div>
-                </div>
-
-                <!-- System Reasoning -->
-                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-                    <div class="flex items-center space-x-2 text-xs font-semibold text-slate-300">
-                        <i data-lucide="cpu" class="w-4 h-4 text-indigo-400"></i>
-                        <span>System Reasoning & Reconciliation:</span>
-                    </div>
-                    <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${c.system_reasoning}</p>
-                </div>
-
-                <!-- Resolution Badge -->
-                <div class="flex items-center space-x-2 text-xs pt-1">
-                    <span class="font-semibold text-slate-400">Outcome:</span>
-                    <span class="text-slate-200 bg-slate-800/90 px-3 py-1 rounded-lg border border-slate-700/60">${c.resolution}</span>
-                </div>
-            </div>
-            `;
-        }).join('');
-
-        if (window.lucide) lucide.createIcons();
-    } catch (e) {
-        container.innerHTML = `<div class="p-6 text-center text-rose-400">Failed to load showcase cases: ${e}</div>`;
-    }
-}
-
-// Load Facts Table
-async function loadFacts() {
-    const tbody = document.getElementById('facts-table-body');
-    const doc = document.getElementById('filter-doc').value;
-    const cat = document.getElementById('filter-cat').value;
-    const q = document.getElementById('fact-search-input').value;
-
-    let url = '/api/facts?';
-    if (doc) url += 'doc=' + encodeURIComponent(doc) + '&';
-    if (cat) url += 'category=' + encodeURIComponent(cat) + '&';
-    if (q) url += 'q=' + encodeURIComponent(q) + '&';
-
-    try {
-        const res = await fetch(url);
-        allFacts = await res.json();
-
-        if (allFacts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-500">No facts found matching criteria.</td></tr>';
-            return;
         }
-
-        tbody.innerHTML = allFacts.map(f => {
-            let catColor = 'bg-slate-800 text-slate-300';
-            if (f.category === 'Financial') catColor = 'bg-blue-500/10 text-blue-400 border border-blue-500/30';
-            else if (f.category === 'Operational') catColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
-            else if (f.category === 'Governance') catColor = 'bg-purple-500/10 text-purple-400 border border-purple-500/30';
-            else if (f.category === 'Strategy') catColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/30';
-
-            return `
-            <tr class="hover:bg-slate-900/60 transition-colors">
-                <td class="px-4 py-3 font-mono text-[11px] text-indigo-300">${f.id}</td>
-                <td class="px-4 py-3">
-                    <div class="font-medium text-slate-200 truncate max-w-[170px]" title="${f.document_name}">${f.document_name}</div>
-                    <div class="text-[11px] text-slate-500">Page ${f.page_number}</div>
-                </td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${catColor}">${f.category}</span>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="font-semibold text-slate-200">${f.subject}</div>
-                    <div class="text-slate-400 text-[11px]">${f.predicate}</div>
-                </td>
-                <td class="px-4 py-3 font-bold text-white">${f.value}</td>
-                <td class="px-4 py-3">
-                    <div class="text-slate-300 font-medium">${f.temporal_period || 'N/A'}</div>
-                    <div class="text-[10px] text-slate-500">${f.entity_scope || 'Consolidated'}</div>
-                </td>
-                <td class="px-4 py-3 text-right">
-                    <button onclick="openEvidenceModal('${f.id}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition-all text-xs inline-flex items-center space-x-1">
-                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                        <span>Inspect</span>
-                    </button>
-                </td>
-            </tr>
-            `;
-        }).join('');
-
-        if (window.lucide) lucide.createIcons();
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-rose-400">Failed to load facts: ${e}</td></tr>`;
+        console.error('Failed to check API status:', e);
     }
 }
 
-function handleFactSearch(e) {
-    if (e.key === 'Enter' || e.target.value.length === 0 || e.target.value.length > 2) {
-        loadFacts();
-    }
-}
-
-// Load Document List
-async function loadDocuments() {
-    const container = document.getElementById('doc-list-container');
-    if (!container) return;
-    try {
-        const res = await fetch('/api/documents');
-        allDocs = await res.json();
-        container.innerHTML = allDocs.map(d => `
-            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2 rounded-lg bg-blue-500/10 text-blue-400"><i data-lucide="file-text" class="w-4 h-4"></i></div>
-                    <div>
-                        <div class="font-medium text-slate-200">${d.filename}</div>
-                        <div class="text-[11px] text-slate-500">${d.page_count} pages · ${d.status}</div>
-                    </div>
-                </div>
-                <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold border border-emerald-500/20">Indexed</span>
-            </div>
-        `).join('');
-        if (window.lucide) lucide.createIcons();
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-// Evidence Inspector Modal
-async function openEvidenceModal(factId) {
-    let fact = allFacts.find(f => f.id === factId);
-    if (!fact) {
-        try {
-            const res = await fetch('/api/facts/' + factId);
-            fact = await res.json();
-        } catch (e) {
-            alert('Failed to load fact details');
-            return;
-        }
-    }
-
-    document.getElementById('modal-fact-title').innerText = fact.subject;
-    document.getElementById('modal-fact-predicate').innerText = fact.predicate;
-    document.getElementById('modal-fact-val').innerText = fact.value;
-    document.getElementById('modal-fact-unit').innerText = fact.unit || 'Standard';
-    document.getElementById('modal-fact-period').innerText = fact.temporal_period || 'N/A';
-    document.getElementById('modal-fact-scope').innerText = fact.entity_scope || 'Consolidated';
-    document.getElementById('modal-fact-location').innerText = fact.document_name + ' · Page ' + fact.page_number;
-    document.getElementById('modal-fact-quote').innerText = `"${fact.exact_quote}"`;
-
-    document.getElementById('evidence-modal').classList.remove('hidden');
-    if (window.lucide) lucide.createIcons();
-}
-
-function closeEvidenceModal() {
-    document.getElementById('evidence-modal').classList.add('hidden');
-}
-
-// Settings Modal
 function openSettingsModal() {
-    document.getElementById('settings-modal').classList.remove('hidden');
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeSettingsModal() {
-    document.getElementById('settings-modal').classList.add('hidden');
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.classList.add('hidden');
 }
 
 async function saveApiKey() {
-    const key = document.getElementById('settings-api-key-input').value.trim();
+    const input = document.getElementById('settings-api-key-input');
+    const key = input ? input.value.trim() : '';
     if (!key) {
         alert('Please enter a valid Gemini API key.');
         return;
@@ -339,138 +105,132 @@ async function saveApiKey() {
             body: JSON.stringify({ api_key: key })
         });
         const data = await res.json();
-        alert(data.message);
+        alert(data.message || 'Key saved.');
         closeSettingsModal();
         checkApiStatus();
     } catch (e) {
-        alert('Failed to save API key: ' + e);
+        alert('Failed to save API key: ' + e.message);
     }
 }
 
-// Query / Ask the Knowledge Layer
-function setQuery(q) {
-    document.getElementById('query-input').value = q;
-    submitQuery();
-}
-
-async function submitQuery() {
-    const input = document.getElementById('query-input');
-    const query = input.value.trim();
-    if (!query) return;
-
-    const btn = document.getElementById('query-btn');
-    const outBox = document.getElementById('query-output-box');
-    const ansText = document.getElementById('answer-text');
-    const countBadge = document.getElementById('answer-source-count');
-    const factsContainer = document.getElementById('grounded-facts-container');
-
-    btn.disabled = true;
-    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Analyzing...</span>`;
-    if (window.lucide) lucide.createIcons();
-
-    outBox.classList.remove('hidden');
-    ansText.innerHTML = `<p class="text-slate-400 italic">Synthesizing verified cross-document facts...</p>`;
-
-    try {
-        const res = await fetch('/api/ask', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: query })
-        });
-        const data = await res.json();
-
-        ansText.innerHTML = window.marked ? marked.parse(data.answer) : data.answer;
-        countBadge.innerText = (data.grounded_facts ? data.grounded_facts.length : 0) + ' citations';
-
-        if (data.grounded_facts && data.grounded_facts.length > 0) {
-            factsContainer.innerHTML = data.grounded_facts.map(f => `
-                <div class="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs">
-                    <div>
-                        <span class="font-bold text-slate-200">${f.subject}</span>: <span class="text-indigo-300 font-semibold">${f.value}</span>
-                        <span class="text-slate-500 ml-2">(${f.document_name}, p. ${f.page_number})</span>
-                    </div>
-                    <button onclick="openEvidenceModal('${f.id}')" class="text-indigo-400 hover:text-indigo-300 font-medium ml-2 underline">Inspect</button>
-                </div>
-            `).join('');
+// -------------------------------------------------------------
+// Showcase Cases (Docket Style)
+// -------------------------------------------------------------
+async function setShowcaseMode(mode) {
+    currentShowcaseMode = mode;
+    const btnDyn = document.getElementById('btn-mode-dynamic');
+    const btnBench = document.getElementById('btn-mode-benchmark');
+    if (btnDyn && btnBench) {
+        if (mode === 'dynamic') {
+            btnDyn.classList.add('active');
+            btnBench.classList.remove('active');
         } else {
-            factsContainer.innerHTML = `<p class="text-xs text-slate-500">No direct atomic facts cited.</p>`;
+            btnDyn.classList.remove('active');
+            btnBench.classList.add('active');
         }
-    } catch (e) {
-        ansText.innerHTML = `<p class="text-rose-400">Query error: ${e}</p>`;
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="send" class="w-4 h-4"></i><span>Query</span>`;
-        if (window.lucide) lucide.createIcons();
     }
+    await loadShowcaseCases();
 }
 
-// PDF Upload Handler
-async function handleFileSelected(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const progressCard = document.getElementById('upload-progress-card');
-    const filenameEl = document.getElementById('upload-filename');
-    const bar = document.getElementById('upload-bar');
-    const msg = document.getElementById('upload-message');
-
-    filenameEl.innerText = file.name;
-    progressCard.classList.remove('hidden');
-    bar.style.width = '35%';
-    msg.innerText = 'Uploading and extracting pages...';
-
-    const depthSelect = document.getElementById('upload-page-depth');
-    const depthVal = depthSelect ? depthSelect.value : '20';
-
-    const formData = new FormData();
-    formData.append('file', file);
-    if (depthVal !== 'all') {
-        formData.append('max_pages', parseInt(depthVal));
-    }
+async function loadShowcaseCases() {
+    const container = document.getElementById('showcase-cards-container');
+    if (!container) return;
 
     try {
-        bar.style.width = '65%';
-        msg.innerText = 'Extracting atomic facts and cross-reconciling relationships...';
+        const res = await fetch(`/api/cases?mode=${currentShowcaseMode}`);
+        const cases = await res.json();
 
-        const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || 'Upload failed');
+        if (!cases || cases.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:36px;color:var(--ink-soft);">No showcase cases found.</div>';
+            return;
         }
 
-        const data = await res.json();
-        bar.style.width = '100%';
-        msg.innerHTML = `
-            <div class="space-y-1">
-                <div class="text-emerald-400 font-medium">Successfully processed ${data.pages_processed} of ${data.total_pages} pages! Extracted ${data.facts_extracted} facts & discovered ${data.new_relationships_discovered} relationships.</div>
-                <div class="text-[11px] text-slate-400">${data.truncation_note}</div>
+        container.innerHTML = cases.map(c => {
+            let relClass = 'corroborate';
+            let relSymbol = '≈';
+            let relText = 'Corroborated';
+
+            if (c.case_type === 'Corroboration') {
+                relClass = 'corroborate';
+                relSymbol = '≈';
+                relText = 'Corroborated';
+            } else if (c.case_type === 'Contradiction') {
+                relClass = 'contradict';
+                relSymbol = '≠';
+                relText = 'Contradiction';
+            } else if (c.case_type === 'Reconciled Contradiction') {
+                relClass = 'reconciled';
+                relSymbol = '≠*';
+                relText = 'Reconciled by context';
+            } else {
+                relClass = 'failure';
+                relSymbol = '—';
+                relText = 'Extraction failure';
+            }
+
+            const isSingle = (c.case_type === 'Reasoning Failure Analysis') || !c.source_evidence_b || !c.source_evidence_b.document;
+            const evA = c.source_evidence_a || {};
+            const evB = c.source_evidence_b || {};
+
+            const originTag = c.is_live_derived
+                ? `<span class="docket-tag" style="color:var(--green);border-color:var(--green);">● Live Discovered</span>`
+                : `<span class="docket-tag">Reference Benchmark</span>`;
+
+            const edgeTag = c.fact_a_id
+                ? `<span class="docket-tag" style="font-family:monospace;font-size:10.5px;">Edge: #${c.fact_a_id} ${c.fact_b_id ? `⟷ #${c.fact_b_id}` : ''}</span>`
+                : '';
+
+            return `
+            <div class="docket-entry">
+                <div class="docket-head">
+                    <span class="docket-number">${c.case_number}</span>
+                    <span class="docket-relation ${relClass}">${relText}</span>
+                    ${originTag}
+                    ${edgeTag}
+                </div>
+                <p class="docket-claim">${escapeHtml(c.title || c.summary)}</p>
+
+                <div class="exhibits ${isSingle ? 'single-exhibit' : ''}">
+                    <div class="exhibit">
+                        <div class="exhibit-source">
+                            <span>${escapeHtml(evA.document || 'Source filing')}</span>
+                            <span>Page ${evA.page != null ? evA.page : '—'}</span>
+                        </div>
+                        <div class="exhibit-value">Stated: <b>${escapeHtml(evA.value || c.predicate_a || 'Reported figure')}</b></div>
+                        <div class="exhibit-quote">"${escapeHtml(evA.quote || 'No excerpt available')}"</div>
+                    </div>
+                    ${!isSingle ? `
+                    <div class="relation-symbol ${relClass}">${relSymbol}</div>
+                    <div class="exhibit">
+                        <div class="exhibit-source">
+                            <span>${escapeHtml(evB.document || 'Source filing')}</span>
+                            <span>Page ${evB.page != null ? evB.page : '—'}</span>
+                        </div>
+                        <div class="exhibit-value">Stated: <b>${escapeHtml(evB.value || c.predicate_b || 'Reported figure')}</b></div>
+                        <div class="exhibit-quote">"${escapeHtml(evB.quote || 'No excerpt available')}"</div>
+                    </div>
+                    ` : ''}
+                </div>
+
+                <div class="docket-why">
+                    <span>Why this matters / Reasoning:</span> ${escapeHtml(c.system_reasoning)}
+                    ${c.resolution ? `<div style="margin-top:6px;"><span>Outcome:</span> ${escapeHtml(c.resolution)}</div>` : ''}
+                </div>
             </div>
-        `;
-
-        fetchStats();
-        loadDocuments();
-        loadFacts();
-        loadShowcaseCases();
-
-        setTimeout(() => {
-            switchTab('explorer');
-        }, 1800);
+            `;
+        }).join('');
 
     } catch (e) {
-        bar.classList.remove('bg-indigo-500');
-        bar.classList.add('bg-rose-500');
-        msg.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--rust);">Failed to load showcase cases: ${escapeHtml(e.message)}</div>`;
     }
 }
 
-// Vis.js Interactive Knowledge Graph
+// -------------------------------------------------------------
+// Interactive Vis.js Knowledge Graph
+// -------------------------------------------------------------
 async function renderKnowledgeGraph() {
     const loader = document.getElementById('graph-loader');
-    if (loader) loader.classList.remove('hidden');
+    if (loader) loader.style.display = 'flex';
 
     try {
         const [docsRes, factsRes, relsRes] = await Promise.all([
@@ -479,74 +239,101 @@ async function renderKnowledgeGraph() {
             fetch('/api/relationships')
         ]);
 
-        const docs = await docsRes.json();
-        const facts = await factsRes.json();
-        const rels = await relsRes.json();
+        allDocs = await docsRes.json();
+        allFacts = await factsRes.json();
+        allRels = await relsRes.json();
+
+        // Populate side document list
+        renderGraphDocList(allDocs, allFacts);
 
         const nodes = [];
         const edges = [];
 
-        docs.forEach(d => {
+        // Document Nodes: Dark ink boxes
+        allDocs.forEach(d => {
+            const shortName = d.filename.replace('.pdf', '').replace(/_/g, ' ');
             nodes.push({
                 id: 'DOC_' + d.id,
-                label: d.filename.replace('.pdf', ''),
-                color: { background: '#1E293B', border: '#3B82F6', highlight: { background: '#3B82F6', border: '#60A5FA' } },
+                label: shortName,
+                color: {
+                    background: '#23241F',
+                    border: '#23241F',
+                    highlight: { background: '#3B5D50', border: '#3B5D50' }
+                },
                 shape: 'box',
-                font: { color: '#F8FAFC', size: 13, bold: true },
-                margin: 10,
-                borderWidth: 2
+                margin: 9,
+                font: { color: '#F6F6F1', size: 12, face: 'Public Sans', bold: true },
+                borderWidth: 1.5,
+                docData: d
             });
         });
 
-        const displayFacts = facts.slice(0, 20);
+        // Fact Nodes: Up to 35 most relevant facts to maintain layout readability
+        const displayFacts = allFacts.slice(0, 35);
         displayFacts.forEach(f => {
-            let bgColor = '#1E1B4B';
-            let borderColor = '#6366F1';
-            if (f.category === 'Operational') { bgColor = '#064E3B'; borderColor = '#10B981'; }
-            if (f.category === 'Governance') { bgColor = '#3B0764'; borderColor = '#A855F7'; }
+            let borderColor = '#CBCCBE';
+            if (f.category === 'Financial') borderColor = '#3B5D50';
+            else if (f.category === 'Operational') borderColor = '#8A6524';
+            else if (f.category === 'Governance') borderColor = '#8B3A2B';
 
             nodes.push({
                 id: f.id,
-                label: f.subject + '\n' + f.value,
-                color: { background: bgColor, border: borderColor },
-                shape: 'ellipse',
-                font: { color: '#E2E8F0', size: 11 },
+                label: `${f.subject}\n${f.value}`,
+                color: {
+                    background: '#F6F6F1',
+                    border: borderColor,
+                    highlight: { background: '#F7F2E1', border: '#23241F' }
+                },
+                shape: 'box',
+                borderRadius: 4,
+                margin: 7,
+                font: { color: '#23241F', size: 10, face: 'Public Sans' },
                 borderWidth: 1.5,
                 factData: f
             });
 
+            // Doc-to-fact spoke edge
             if (f.document_id) {
                 edges.push({
+                    id: `edge_doc_${f.id}`,
                     from: 'DOC_' + f.document_id,
                     to: f.id,
-                    color: { color: '#334155', opacity: 0.6 },
-                    dashes: true,
+                    color: { color: '#CBCCBE', highlight: '#5C5D53' },
+                    dashes: [3, 3],
                     width: 1
                 });
             }
         });
 
-        rels.forEach(r => {
-            let color = '#10B981';
+        // Relationship Cross-Document Edges
+        allRels.forEach(r => {
+            let color = '#3B5D50'; // corroboration
             let dashes = false;
             if (r.rel_type === 'contradiction') {
-                color = '#F43F5E';
-                dashes = [5, 5];
+                color = '#8B3A2B';
+                dashes = [5, 4];
             } else if (r.rel_type === 'reconciled') {
-                color = '#F59E0B';
+                color = '#8A6524';
             }
 
             edges.push({
-                id: r.id,
+                id: 'rel_' + r.id,
                 from: r.fact_a_id,
                 to: r.fact_b_id,
                 label: r.rel_type.toUpperCase(),
                 color: { color: color, highlight: color },
-                font: { color: color, size: 9, strokeWidth: 2, strokeColor: '#0B0F19' },
-                width: 2.5,
+                font: {
+                    color: '#23241F',
+                    size: 9,
+                    face: 'Public Sans',
+                    background: '#F6F6F1',
+                    strokeWidth: 0
+                },
+                width: 2.2,
                 dashes: dashes,
                 arrows: 'to, from',
-                smooth: { type: 'curvedCW', roundness: 0.2 }
+                smooth: { type: 'curvedCW', roundness: 0.2 },
+                relData: r
             });
         });
 
@@ -560,37 +347,450 @@ async function renderKnowledgeGraph() {
 
         const options = {
             physics: {
-                stabilization: false,
+                stabilization: { iterations: 120 },
                 barnesHut: {
-                    springLength: 140,
-                    avoidOverlap: 0.2
+                    gravitationalConstant: -3200,
+                    centralGravity: 0.2,
+                    springLength: 130,
+                    springConstant: 0.04,
+                    damping: 0.09,
+                    avoidOverlap: 0.35
                 }
             },
             interaction: {
                 hover: true,
-                tooltipDelay: 100
+                tooltipDelay: 100,
+                zoomView: true,
+                dragView: true
             }
         };
 
+        if (network) {
+            network.destroy();
+        }
+
         network = new vis.Network(container, data, options);
 
+        // Click interaction: inspect nodes and edges
         network.on('click', (params) => {
+            const inspector = document.getElementById('graph-inspector');
+            const inspTitle = document.getElementById('inspector-title');
+            const inspBody = document.getElementById('inspector-body');
+
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
-                if (nodeId.startsWith('FACT-')) {
-                    openEvidenceModal(nodeId);
+                if (nodeId.startsWith('DOC_')) {
+                    const docId = parseInt(nodeId.replace('DOC_', ''));
+                    const doc = allDocs.find(d => d.id === docId);
+                    if (doc && inspector && inspTitle && inspBody) {
+                        inspector.style.display = 'block';
+                        inspTitle.innerText = doc.filename;
+                        const docFactsCount = allFacts.filter(f => f.document_id === doc.id).length;
+                        inspBody.innerHTML = `
+                            <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:6px;">${doc.page_count} indexed pages · ${doc.status}</div>
+                            <div style="font-size:13px;color:var(--ink);">Contains <b>${docFactsCount}</b> extracted atomic facts in the active ledger.</div>
+                            <div style="margin-top:10px;">
+                                <button class="evidence-link" onclick="filterByDocument('${escapeHtml(doc.filename)}')">Filter facts for this document →</button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Fact node
+                    const fact = allFacts.find(f => f.id === nodeId);
+                    if (fact && inspector && inspTitle && inspBody) {
+                        inspector.style.display = 'block';
+                        inspTitle.innerText = fact.subject;
+                        inspBody.innerHTML = `
+                            <div style="margin-bottom:6px;font-size:13px;"><b>Value:</b> <span style="font-weight:600;color:var(--ink);">${escapeHtml(fact.value)}</span></div>
+                            <div style="margin-bottom:6px;font-size:12px;color:var(--ink-soft);">${escapeHtml(fact.document_name)} · Page ${fact.page_number}</div>
+                            <div class="exhibit-quote" style="margin:8px 0 10px;font-size:12.5px;">"${escapeHtml(fact.exact_quote)}"</div>
+                            <button class="evidence-link" onclick="openEvidenceModal('${fact.id}')">View full evidence →</button>
+                        `;
+                    }
+                }
+            } else if (params.edges.length > 0) {
+                const edgeId = params.edges[0];
+                if (edgeId.startsWith('rel_')) {
+                    const relId = parseInt(edgeId.replace('rel_', ''));
+                    const rel = allRels.find(r => r.id === relId);
+                    if (rel && inspector && inspTitle && inspBody) {
+                        inspector.style.display = 'block';
+                        inspTitle.innerText = `${rel.rel_type.toUpperCase()}: ${rel.predicate_a}`;
+                        inspBody.innerHTML = `
+                            <div style="margin-bottom:8px;font-size:12.5px;color:var(--ink-soft);">${escapeHtml(rel.doc_a)} ⟷ ${escapeHtml(rel.doc_b)}</div>
+                            <div class="exhibit-quote" style="margin:8px 0 10px;font-size:12.5px;">${escapeHtml(rel.reasoning)}</div>
+                            <div style="font-size:12px;color:var(--ink-soft);">Confidence: ${(rel.confidence * 100).toFixed(0)}%</div>
+                        `;
+                    }
                 }
             }
         });
 
-        if (loader) loader.classList.add('hidden');
+        if (loader) loader.style.display = 'none';
+
     } catch (e) {
-        if (loader) loader.innerHTML = `<span class="text-rose-400">Failed to load graph: ${e}</span>`;
+        if (loader) loader.innerHTML = `<span style="color:var(--rust);">Failed to load graph: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+function renderGraphDocList(docs, facts) {
+    const listContainer = document.getElementById('graph-doc-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = docs.map(d => {
+        const count = facts.filter(f => f.document_id === d.id).length;
+        const shortName = d.filename.replace('.pdf', '').replace(/_/g, ' ');
+        return `
+        <div class="graph-doc-item" onclick="focusGraphDocument(${d.id})" title="Center graph on ${escapeHtml(shortName)}">
+            <b>${escapeHtml(shortName)}</b>
+            <span>${count} facts · ${d.page_count}p</span>
+        </div>
+        `;
+    }).join('');
+}
+
+function focusGraphDocument(docId) {
+    if (network) {
+        network.focus('DOC_' + docId, {
+            scale: 1.1,
+            animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
     }
 }
 
 function resetGraphView() {
     if (network) {
-        network.fit();
+        network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
     }
+}
+
+function filterByDocument(docName) {
+    switchTab('facts');
+    const docSelect = document.getElementById('filter-doc');
+    if (docSelect) {
+        docSelect.value = docName;
+        loadFacts();
+    }
+}
+
+// -------------------------------------------------------------
+// Fact Ledger Table
+// -------------------------------------------------------------
+async function loadFacts() {
+    const tbody = document.getElementById('facts-table-body');
+    const docSelect = document.getElementById('filter-doc');
+    const catSelect = document.getElementById('filter-cat');
+    const searchInput = document.getElementById('fact-search-input');
+    const countLabel = document.getElementById('ledger-count');
+
+    const doc = docSelect ? docSelect.value : '';
+    const cat = catSelect ? catSelect.value : '';
+    const q = searchInput ? searchInput.value.trim() : '';
+
+    let url = '/api/facts?';
+    if (doc) url += 'doc=' + encodeURIComponent(doc) + '&';
+    if (cat) url += 'category=' + encodeURIComponent(cat) + '&';
+    if (q) url += 'q=' + encodeURIComponent(q) + '&';
+
+    try {
+        const res = await fetch(url);
+        allFacts = await res.json();
+
+        if (countLabel) {
+            countLabel.innerText = `Showing ${allFacts.length} grounded facts.`;
+        }
+
+        if (allFacts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--ink-soft);">No facts found matching criteria.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = allFacts.map(f => {
+            return `
+            <tr>
+                <td class="claim-cell">
+                    <b>${escapeHtml(f.subject)}</b>
+                    <span>${escapeHtml(f.predicate)}</span>
+                </td>
+                <td><b>${escapeHtml(f.value)}</b></td>
+                <td>
+                    ${escapeHtml(f.temporal_period || '—')}
+                    ${f.entity_scope ? `<span style="display:block;font-size:11.5px;color:var(--ink-soft);">${escapeHtml(f.entity_scope)}</span>` : ''}
+                </td>
+                <td class="doc-cell">
+                    <b>${escapeHtml(f.document_name)}</b>
+                    <span>Page ${f.page_number}</span>
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                    <button class="evidence-link" onclick="openEvidenceModal('${f.id}')">View quote →</button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+    } catch (e) {
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--rust);">Failed to load facts: ${escapeHtml(e.message)}</td></tr>`;
+        }
+    }
+}
+
+function handleFactSearch(e) {
+    if (e.key === 'Enter' || e.target.value.length === 0 || e.target.value.length > 2) {
+        loadFacts();
+    }
+}
+
+// -------------------------------------------------------------
+// Document List & Ingestion
+// -------------------------------------------------------------
+async function loadDocuments() {
+    try {
+        const res = await fetch('/api/documents');
+        allDocs = await res.json();
+
+        // Update Document dropdown in Fact Ledger
+        const docSelect = document.getElementById('filter-doc');
+        if (docSelect) {
+            const currentVal = docSelect.value;
+            let optionsHtml = '<option value="">All documents</option>';
+            allDocs.forEach(d => {
+                optionsHtml += `<option value="${escapeHtml(d.filename)}">${escapeHtml(d.filename)}</option>`;
+            });
+            docSelect.innerHTML = optionsHtml;
+            docSelect.value = currentVal;
+        }
+
+        // Update Document list in Upload tab
+        const container = document.getElementById('doc-list-container');
+        if (container) {
+            container.innerHTML = allDocs.map(d => `
+                <div class="docrow">
+                    <div>
+                        <b>${escapeHtml(d.filename)}</b>
+                        <div><span>${d.page_count} pages · ${d.status}</span></div>
+                    </div>
+                    <div class="status">✓ Indexed</div>
+                </div>
+            `).join('');
+        }
+
+    } catch (e) {
+        console.error('Failed to load documents:', e);
+    }
+}
+
+function initDropzone() {
+    const dropzone = document.getElementById('dropzone');
+    if (!dropzone) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = 'var(--ink)';
+            dropzone.style.background = '#ECECE5';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = 'var(--rule-strong)';
+            dropzone.style.background = 'var(--paper-raised)';
+        }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            uploadFile(files[0]);
+        }
+    }, false);
+}
+
+function handleFileSelected(event) {
+    const file = event.target.files[0];
+    if (file) {
+        uploadFile(file);
+    }
+}
+
+async function uploadFile(file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('Please select a valid PDF file.');
+        return;
+    }
+
+    const progressCard = document.getElementById('upload-progress-card');
+    const bar = document.getElementById('upload-bar');
+    const msg = document.getElementById('upload-message');
+    const depthSelect = document.getElementById('upload-page-depth');
+
+    if (progressCard) progressCard.style.display = 'block';
+    if (bar) bar.style.width = '30%';
+    if (msg) msg.innerText = `Uploading ${file.name} and extracting text...`;
+
+    const depthVal = depthSelect ? depthSelect.value : '20';
+    const formData = new FormData();
+    formData.append('file', file);
+    if (depthVal !== 'all') {
+        formData.append('max_pages', parseInt(depthVal));
+    }
+
+    try {
+        if (bar) bar.style.width = '60%';
+        if (msg) msg.innerText = 'Extracting atomic claims and running incremental cross-reconciliation...';
+
+        const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Upload failed');
+        }
+
+        const data = await res.json();
+        if (bar) bar.style.width = '100%';
+        if (msg) {
+            msg.innerHTML = `
+                <div style="color:var(--green);font-weight:500;margin-bottom:4px;">
+                    Successfully processed ${data.pages_processed} of ${data.total_pages} pages!
+                </div>
+                <div style="font-size:12.5px;color:var(--ink-soft);">
+                    Extracted <b>${data.facts_extracted}</b> facts · Discovered <b>${data.new_relationships_discovered}</b> cross-document relationships.
+                </div>
+                ${data.truncation_note ? `<div style="font-size:11.5px;color:var(--ink-faint);margin-top:4px;">${data.truncation_note}</div>` : ''}
+            `;
+        }
+
+        // Refresh all data
+        await loadDocuments();
+        await loadFacts();
+        await loadShowcaseCases();
+
+    } catch (e) {
+        if (bar) {
+            bar.style.width = '100%';
+            bar.style.background = 'var(--rust)';
+        }
+        if (msg) {
+            msg.innerHTML = `<span style="color:var(--rust);font-weight:500;">Error: ${escapeHtml(e.message)}</span>`;
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// Grounded Ask Engine
+// -------------------------------------------------------------
+function setAskQuery(query) {
+    const input = document.getElementById('ask-input');
+    if (input) {
+        input.value = query;
+        askQuestion();
+    }
+}
+
+async function askQuestion() {
+    const input = document.getElementById('ask-input');
+    const query = input ? input.value.trim() : '';
+    if (!query) return;
+
+    const btn = document.getElementById('ask-btn');
+    const loading = document.getElementById('ask-loading');
+    const resultWrap = document.getElementById('ask-result-wrap');
+    const ansText = document.getElementById('ask-answer-text');
+    const sourcesList = document.getElementById('ask-sources-list');
+
+    if (btn) btn.disabled = true;
+    if (loading) loading.style.display = 'block';
+    if (resultWrap) resultWrap.style.display = 'none';
+
+    try {
+        const res = await fetch('/api/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: query })
+        });
+        const data = await res.json();
+
+        // Format Markdown answer text
+        let formatted = escapeHtml(data.answer || '');
+        formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+        formatted = formatted.replace(/\*(.*?)\*/g, '<i>$1</i>');
+        formatted = formatted.replace(/\n\n/g, '<br><br>');
+        formatted = formatted.replace(/\n/g, '<br>');
+
+        if (ansText) ansText.innerHTML = formatted;
+
+        if (sourcesList) {
+            if (data.grounded_facts && data.grounded_facts.length > 0) {
+                sourcesList.innerHTML = data.grounded_facts.map((f, i) => `
+                    <div class="ask-source">
+                        <b>[${i + 1}]</b>
+                        <div style="flex:1;">
+                            <span style="color:var(--ink);font-weight:500;">${escapeHtml(f.subject)}: ${escapeHtml(f.value)}</span>
+                            <span style="color:var(--ink-soft);margin-left:6px;">— ${escapeHtml(f.document_name)}, Page ${f.page_number}</span>
+                            <button class="evidence-link" style="margin-left:8px;" onclick="openEvidenceModal('${f.id}')">View quote →</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                sourcesList.innerHTML = '<div style="font-size:13px;color:var(--ink-soft);">No direct atomic facts cited.</div>';
+            }
+        }
+
+        if (resultWrap) resultWrap.style.display = 'block';
+
+    } catch (e) {
+        if (ansText) ansText.innerHTML = `<span style="color:var(--rust);">Query error: ${escapeHtml(e.message)}</span>`;
+        if (resultWrap) resultWrap.style.display = 'block';
+    } finally {
+        if (loading) loading.style.display = 'none';
+        if (btn) btn.disabled = false;
+    }
+}
+
+// -------------------------------------------------------------
+// Evidence Inspector Modal
+// -------------------------------------------------------------
+async function openEvidenceModal(factId) {
+    let fact = allFacts.find(f => f.id === factId);
+    if (!fact) {
+        try {
+            const res = await fetch('/api/facts/' + factId);
+            fact = await res.json();
+        } catch (e) {
+            alert('Failed to load fact details: ' + e.message);
+            return;
+        }
+    }
+
+    const titleEl = document.getElementById('modal-fact-title');
+    const predEl = document.getElementById('modal-fact-predicate');
+    const valEl = document.getElementById('modal-fact-val');
+    const periodEl = document.getElementById('modal-fact-period');
+    const scopeEl = document.getElementById('modal-fact-scope');
+    const locEl = document.getElementById('modal-fact-location');
+    const quoteEl = document.getElementById('modal-fact-quote');
+
+    if (titleEl) titleEl.innerText = fact.subject || 'Claim Evidence';
+    if (predEl) predEl.innerText = fact.predicate || '—';
+    if (valEl) valEl.innerText = fact.value || '—';
+    if (periodEl) periodEl.innerText = (fact.unit ? fact.unit + ' · ' : '') + (fact.temporal_period || 'N/A');
+    if (scopeEl) scopeEl.innerText = fact.entity_scope || 'Consolidated';
+    if (locEl) locEl.innerText = `${fact.document_name} · Page ${fact.page_number}`;
+    if (quoteEl) quoteEl.innerText = `"${fact.exact_quote || 'No excerpt recorded'}"`;
+
+    const modal = document.getElementById('evidence-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeEvidenceModal() {
+    const modal = document.getElementById('evidence-modal');
+    if (modal) modal.classList.add('hidden');
 }
