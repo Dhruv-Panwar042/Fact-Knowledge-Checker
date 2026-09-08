@@ -169,8 +169,8 @@ flowchart TD
     class R3 reconcCard;
     class Z1,Z2,Z3 indigoCard;
 
-    %% Bold Black Connecting Edges & Text
-    linkStyle default stroke:#000000,stroke-width:2.5px,color:#000000;
+    %% Bold Black Connecting Edges
+    linkStyle default stroke:black,stroke-width:2px;
 ```
 
 ```
