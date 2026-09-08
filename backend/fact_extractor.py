@@ -1,8 +1,11 @@
 import json
 import re
 import uuid
+import time
 from typing import List, Dict, Any, Optional
 from backend.config import GEMINI_API_KEY, GEMINI_MODEL
+
+_EXTRACTOR_COOLDOWN_UNTIL = 0
 
 EXTRACTION_SYSTEM_PROMPT = """
 You are an expert document analysis and factual verification engine.
@@ -28,10 +31,11 @@ Return ONLY a JSON array of fact objects. No other markdown or conversational fi
 def extract_facts_from_page(doc_name: str, page_num: int, text: str, api_key: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Extracts facts from page text using Gemini API or intelligent heuristic fallback.
-    Completely generic: accepts any document from any company.
+    Protected against 429 quota exhaustion.
     """
+    global _EXTRACTOR_COOLDOWN_UNTIL
     active_key = api_key or GEMINI_API_KEY
-    if active_key and len(text.strip()) > 30:
+    if active_key and len(text.strip()) > 30 and time.time() >= _EXTRACTOR_COOLDOWN_UNTIL:
         try:
             import google.generativeai as genai
             genai.configure(api_key=active_key)
@@ -54,9 +58,14 @@ def extract_facts_from_page(doc_name: str, page_num: int, text: str, api_key: Op
                     extracted.append(item)
                 return extracted
         except Exception as e:
-            print(f"Gemini extraction error on page {page_num}: {e}")
+            err_str = str(e)
+            if "429" in err_str or "quota" in err_str.lower():
+                _EXTRACTOR_COOLDOWN_UNTIL = time.time() + 60
+                print(f"Notice: Gemini quota reached on page {page_num}. Falling back to heuristic extraction.")
+            else:
+                print(f"Gemini extraction error on page {page_num}: {e}")
 
-    # Fallback heuristic extractor (generic, no hardcoded entities)
+    # Fallback heuristic extractor (generic, zero latency)
     return fallback_heuristic_extractor(doc_name, page_num, text)
 
 def infer_document_entity(doc_name: str, text: str) -> str:
@@ -65,7 +74,6 @@ def infer_document_entity(doc_name: str, text: str) -> str:
     words = clean_name.split()
     if words:
         return words[0].title()
-    # Check first few lines for capitalized entity
     for line in text.split("\n")[:5]:
         line_clean = line.strip()
         if len(line_clean) > 3 and line_clean.isupper():
@@ -80,7 +88,6 @@ def fallback_heuristic_extractor(doc_name: str, page_num: int, text: str) -> Lis
     facts = []
     entity = infer_document_entity(doc_name, text)
     
-    # Generic metric pattern: [Metric Name] ... [Currency/Number] [Unit]
     metric_patterns = [
         (r"(Revenue|Total income|Turnover)\D*?([₹$€£]?\s*[\d,]+(?:\.\d+)?\s*(?:Cr|million|billion|crores|mn|bn)?)", "Financial"),
         (r"(EBITDA|Profit|Loss|Net income)\D*?([₹$€£]?\s*[\d,]+(?:\.\d+)?\s*(?:Cr|million|billion|crores|mn|bn)?)", "Financial"),
@@ -95,7 +102,6 @@ def fallback_heuristic_extractor(doc_name: str, page_num: int, text: str) -> Lis
             if len(val) < 2 or not any(c.isdigit() for c in val):
                 continue
             
-            # Find context window for quote
             start = max(0, m.start() - 25)
             end = min(len(text), m.end() + 35)
             quote = text[start:end].replace("\n", " ").strip()
